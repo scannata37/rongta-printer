@@ -14,6 +14,7 @@ import datetime as dt
 import re
 from typing import List, Optional
 
+from .presets import TODO_ROUTINES
 from .slip import Slip
 from .text import capitalize, date_line, split_chunks, strip_lead
 
@@ -32,9 +33,20 @@ INTRO_RE = re.compile(r"^(?:my |the )?(?:to[- ]?do|todo|task)s?(?: list)?(?: for
                       r"^here'?s (?:my|the) list$|^that'?s (?:it|all)$", re.I)
 
 
+ROUTINE_RE = re.compile(
+    r"\b(?:my |the )?(daily (?:routine|habits|essentials)|deep work day|focus day|reset day)\b", re.I)
+
+
 def parse(text: str) -> dict:
     """Return {"items": [{"text": str, "priority": bool}, ...]}."""
     text = (text or "").strip()
+    preset: List[dict] = []
+    m = ROUTINE_RE.search(text)
+    if m:
+        phrase = m.group(1).lower()
+        key = "daily" if phrase.startswith("daily") else ("reset" if "reset" in phrase else "deep")
+        preset = [{"text": t, "priority": False} for t in TODO_ROUTINES[key]["items"]]
+        text = text[:m.start()] + text[m.end():]
     head, sep, tail = text.partition(":")
     # "My to-do list for today: ..." -> keep what follows the colon
     if sep and re.search(r"\b(?:list|to[- ]?do|todo|tasks?|plan)\b", head, re.I):
@@ -51,8 +63,8 @@ def parse(text: str) -> dict:
             else:
                 chunks.append(c)
 
-    items: List[dict] = []
-    seen = set()
+    items: List[dict] = list(preset)
+    seen = {i["text"].lower() for i in items}
     for chunk in chunks:
         is_priority = bool(PRIORITY_RE.search(chunk))
         cleaned = PRIORITY_RE.sub("", chunk)

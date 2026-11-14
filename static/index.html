@@ -89,6 +89,25 @@
   .star.on { color: #d79b16; }
   .star:hover { background: #f6efdc; }
   .opt { display: none; } .opt.show { display: flex; }
+  #presets { margin: 0 0 22px; }
+  #presets:empty { display: none; }
+  .routines { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .routine { text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 10px;
+             padding: 11px 13px; cursor: pointer; font: inherit; color: var(--ink); }
+  .routine:hover { border-color: var(--accent); background: #f3f8f4; }
+  .routine b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .routine span { font-size: 12px; color: var(--muted); }
+  details.lib { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  details.lib summary { cursor: pointer; padding: 10px 13px; font-size: 14px; font-weight: 600; }
+  .libgroups { padding: 2px 13px 12px; }
+  .libgroup { margin-top: 8px; }
+  .libgroup h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+          border-radius: 99px; padding: 5px 11px; cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip small { opacity: .7; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -108,6 +127,8 @@
     <label class="h" for="dictation" id="dictLabel">Say your list</label>
     <textarea id="dictation" autofocus></textarea>
     <div class="hint" id="hint"></div>
+
+    <div id="presets"></div>
 
     <label class="h" for="title" id="titleLabel">Title</label>
     <input id="title" type="text">
@@ -156,7 +177,8 @@ const MODES = {
     titlePh: "Optional — defaults to TO-DO", addPh: "Add a task and press Enter",
     printLabel: "Print to-dos",
     placeholder: "e.g. “Today I need to call the bank, it’s urgent, finish my resume, go to the gym and call mom and dad.”",
-    hint: "Say “urgent”, “important” or “top priority” and the task goes in the PRIORITY section. Tap ★ to change it.",
+    hint: "Say “urgent”, “important” or “top priority” and the task goes in the PRIORITY section. Tap ★ to change it. Say “my daily routine” to load the preset.",
+    routinesLabel: "Start from a routine", libLabel: "Add common tasks",
     key: (i) => norm(i.text), label: (i) => i.text,
     fromText: (t) => ({ text: t[0].toUpperCase() + t.slice(1), priority: false }),
     row: (item, set) => {
@@ -172,7 +194,9 @@ const MODES = {
     titlePh: "Optional — e.g. Push day", addPh: "Add an exercise, e.g. “Squat 5x5 at 225”, and press Enter",
     printLabel: "Print workout",
     placeholder: "e.g. “Push day. Bench press 3 sets of 8 at 185, incline dumbbell press 3x10 with 60s, tricep pushdowns 3 by 12, and 20 minutes on the treadmill.”",
-    hint: "Say sets × reps (“3 sets of 8”, “3x8”, “3 by 8”), weight (“at 185”, “100 kg”) or time (“20 minutes”). Each set prints a box with a blank to write what you actually did.",
+    hint: "Say “today’s push”, “today’s pull” or “today’s legs” to load a full workout, or your own: “3 sets of 8 at 185”, “3x8”, “20 minutes”. Each set prints a box with a blank to write what you actually did.",
+    routinesLabel: "Today’s workout", libLabel: "Add exercises",
+    chipNote: (i) => i.duration || (i.sets && i.reps ? `${i.sets}×${i.reps}` : ""),
     key: (i) => norm(i.name), label: (i) => i.name, rowClass: "ex",
     fromText: (t) => ({ name: t, sets: null, reps: null, weight: null, unit: "lb", duration: null }),
     row: (item, set) => {
@@ -231,6 +255,63 @@ function currentItems() {
 }
 
 // ---------------------------------------------------------------------------
+// Presets: one tap loads a whole routine (replacing the list); chips in the
+// library add or remove single items.
+// ---------------------------------------------------------------------------
+let PRESETS = {};
+
+function loadRoutine(r) {
+  const items = r.exercises || r.items;
+  S[mode] = { ...fresh(), manual: items.map((i) => ({ ...i })), title: r.title };
+  switchMode(mode);
+  toast(`${r.emoji || ""} Loaded ${r.label} — edit anything, then print`);
+}
+
+function toggleChip(item) {
+  const c = cfg(), s = st(), k = c.key(item);
+  const inList = currentItems().some((i) => i.k === k || c.key(i.item) === k);
+  if (inList) { s.removed.add(k); }
+  else { s.manual.push({ ...item }); s.removed.delete(k); delete s.edits[k]; }
+  renderItems(); refreshPreview();
+}
+
+function renderPresets() {
+  const box = $("presets"), p = PRESETS[mode], c = cfg(); box.innerHTML = "";
+  if (!p) return;
+  const lab = document.createElement("label"); lab.className = "h"; lab.textContent = c.routinesLabel;
+  const grid = document.createElement("div"); grid.className = "routines";
+  for (const r of Object.values(p.routines)) {
+    const b = document.createElement("button"); b.className = "routine";
+    b.innerHTML = `<b></b><span></span>`;
+    b.querySelector("b").textContent = `${r.emoji} ${r.label}`;
+    b.querySelector("span").textContent = r.blurb;
+    b.onclick = () => loadRoutine(r); grid.append(b);
+  }
+  const det = document.createElement("details"); det.className = "lib";
+  if (sessionStorage.getItem("lib-" + mode) === "1") det.open = true;
+  det.ontoggle = () => sessionStorage.setItem("lib-" + mode, det.open ? "1" : "0");
+  det.innerHTML = `<summary></summary><div class="libgroups"></div>`;
+  det.querySelector("summary").textContent = c.libLabel;
+  const groups = det.querySelector(".libgroups");
+  const inList = new Set(currentItems().map((i) => c.key(i.item)));
+  for (const [g, items] of Object.entries(p.library)) {
+    const wrap = document.createElement("div"); wrap.className = "libgroup";
+    wrap.innerHTML = `<h4></h4><div class="chips"></div>`; wrap.querySelector("h4").textContent = g;
+    for (const it of items) {
+      const chip = document.createElement("button");
+      chip.className = "chip" + (inList.has(c.key(it)) ? " on" : "");
+      chip.textContent = c.label(it);
+      const note = c.chipNote && c.chipNote(it);
+      if (note) { const sm = document.createElement("small"); sm.textContent = note; chip.append(sm); }
+      chip.onclick = () => toggleChip(it);
+      wrap.querySelector(".chips").append(chip);
+    }
+    groups.append(wrap);
+  }
+  box.append(lab, grid, det);
+}
+
+// ---------------------------------------------------------------------------
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} :
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -279,6 +360,7 @@ const parseDictation = debounce(async () => {
 
 function renderItems() {
   const ul = $("items"), c = cfg(), s = st(); ul.innerHTML = "";
+  renderPresets();
   const items = currentItems();
   if (!items.length) {
     ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add below.</li>'; return;
@@ -344,6 +426,7 @@ $("clear").onclick = () => { S[mode] = fresh(); switchMode(mode); };
 document.querySelectorAll(".mode").forEach((b) => b.onclick = () => switchMode(b.dataset.mode));
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) doPrint(); });
 
+api("/api/presets").then((p) => { PRESETS = p; renderPresets(); }).catch(() => {});
 switchMode(mode); checkStatus(); setInterval(checkStatus, 15000);
 </script>
 </body>

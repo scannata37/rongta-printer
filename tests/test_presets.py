@@ -1,0 +1,43 @@
+import unittest
+
+from receipt import gym, presets, todo
+
+
+class PresetTests(unittest.TestCase):
+    def test_voice_loads_each_split(self):
+        for said, key in [("Today's push", "push"), ("today's pull", "pull"),
+                          ("today is legs", "legs"), ("leg day", "legs")]:
+            r = gym.parse(said)
+            expected = [e["name"] for e in presets.GYM_ROUTINES[key]["exercises"]]
+            self.assertEqual([e["name"] for e in r["exercises"]], expected, said)
+
+    def test_preset_plus_extras(self):
+        r = gym.parse("Today's push, plus dips 3x10")
+        self.assertEqual(r["exercises"][-1]["name"], "Dips")
+        self.assertEqual(len(r["exercises"]), len(presets.GYM_ROUTINES["push"]["exercises"]) + 1)
+
+    def test_push_day_with_own_exercises_is_just_a_title(self):
+        r = gym.parse("Push day. Bench press 3 sets of 8 at 185")
+        self.assertEqual(r["title"], "Push day")
+        self.assertEqual([e["name"] for e in r["exercises"]], ["Bench press"])
+
+    def test_pull_ups_does_not_trigger_pull_preset(self):
+        r = gym.parse("pull-ups 3x8, tricep pushdowns 3x12")
+        self.assertEqual([e["name"] for e in r["exercises"]], ["Pull-ups", "Tricep pushdowns"])
+
+    def test_todo_daily_routine_by_voice(self):
+        items = [i["text"] for i in todo.parse("my daily routine, plus call the dentist")["items"]]
+        self.assertIn("Walk 10,000 steps", items)
+        self.assertIn("Study AI tools for 2 hours", items)
+        self.assertEqual(items[-1], "Call the dentist")
+
+    def test_presets_payload_shape(self):
+        p = presets.all_presets()
+        self.assertEqual(set(p["gym"]["routines"]), {"push", "pull", "legs"})
+        for group in p["todo"]["library"].values():
+            for item in group:
+                self.assertEqual(set(item), {"text", "priority"})
+
+
+if __name__ == "__main__":
+    unittest.main()

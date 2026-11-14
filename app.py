@@ -7,6 +7,7 @@ No installs needed: standard-library Python only.
 Routes
   GET  /              the web UI (static/index.html)
   GET  /api/status    is the printer queue ready?
+  GET  /api/presets   built-in workouts / to-do items (receipt/presets.py)
   POST /api/parse     {"mode", "text"}                       -> {"title", "items"}
   POST /api/preview   {"mode", "title", "items", "options"}  -> {"rows": [...]}
   POST /api/print     same body as preview                   -> {"ok", "detail"}
@@ -23,7 +24,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from receipt import modes, printer
+from receipt import modes, presets, printer
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
@@ -65,6 +66,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         elif self.path == "/api/status":
             self._json(200, printer.status())
+        elif self.path == "/api/presets":
+            self._json(200, presets.all_presets())
         else:
             self._json(404, {"error": "not found"})
 

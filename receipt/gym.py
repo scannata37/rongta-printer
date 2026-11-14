@@ -15,10 +15,11 @@ import datetime as dt
 import re
 from typing import List, Optional
 
+from .presets import GYM_ROUTINES
 from .slip import Slip
 from .text import capitalize, date_line, split_chunks, strip_lead, words_to_digits
 
-FILLERS = (r"and|also|plus|then|oh|um|uh|so|okay|ok|alright|first|next|finally|"
+FILLERS = (r"add in|add|and|also|plus|then|oh|um|uh|so|okay|ok|alright|first|next|finally|"
            r"lastly|today|i'm doing|i am doing|i'm gonna do|i'm going to do|"
            r"i'm going to|i want to do|i want to|i'll do|i'll|let's do|"
            r"we're doing|doing|do|some|a few|a couple of|a|an|the|i|gonna")
@@ -37,8 +38,13 @@ WEIGHT_RE = re.compile(
     r"(?:(?:\bat|@|\bwith|\busing)\s*)?(\d+(?:\.\d+)?)\s*(lbs?\b|pounds?\b|kgs?\b|kilos?\b|s\b)?", re.I)
 DURATION_RE = re.compile(
     r"\b(\d+(?:\.\d+)?)\s*(min(?:ute)?s?|hours?|hrs?|miles?|mi|km|seconds?|secs?)\b", re.I)
+# "Today's push", "it's pull day", "legs workout", "doing legs" -> load that preset.
+PRESET_RE = re.compile(
+    r"\b(?:(?:today'?s|today is|it'?s|doing|let'?s do|time for)\s+(push|pull|legs?)\b"
+    r"(?:\s+(?:day|workout))?|(push|pull|legs?)\s+(?:day|workout)\b)", re.I)
+
 # Words that mean a chunk is chatter, not an exercise.
-SKIP_RE = re.compile(r"^(?:workout|that'?s it|that'?s all|done|warm ?up)$", re.I)
+SKIP_RE = re.compile(r"^(?:workout|that'?s it|that'?s all|done|warm ?up|add|also add|plus)$", re.I)
 
 
 def _unit(u: Optional[str]) -> str:
@@ -103,17 +109,35 @@ def parse(text: str) -> dict:
     """Return {"title": str|None, "exercises": [...]}."""
     text = (text or "").strip()
     title = None
-    m = TITLE_RE.search(text)
+    preset: List[dict] = []
+    m = PRESET_RE.search(text)
+    if m:
+        key = (m.group(1) or m.group(2)).lower()
+        key = "legs" if key.startswith("leg") else key
+        rest = text[:m.start()] + text[m.end():]
+        rest_body = rest.split(":", 1)[1] if ":" in rest else rest
+        said_exercises = any(parse_exercise(c) for c in split_chunks(rest_body))
+        # "Today's push" always loads the preset. "Push day" only does when
+        # nothing else was said; otherwise it's just the title of their own list.
+        if m.group(1) or not said_exercises:
+            routine = GYM_ROUTINES[key]
+            title = routine["title"]
+            preset = [dict(e) for e in routine["exercises"]]
+            text = rest
+    m = None if preset else TITLE_RE.search(text)
     if m:
         title = "%s %s" % (m.group(1), m.group(2))
         text = text[:m.start()] + text[m.end():]
     if ":" in text:
         text = text.split(":", 1)[1]
 
-    exercises: List[dict] = []
+    # Preset first, then anything else they said ("today's push, add face pulls")
+    exercises: List[dict] = list(preset)
+    names = {e["name"].lower() for e in exercises}
     for chunk in split_chunks(text):
         ex = parse_exercise(chunk)
-        if ex:
+        if ex and ex["name"].lower() not in names:
+            names.add(ex["name"].lower())
             exercises.append(ex)
     return {"title": capitalize(title) if title else None, "exercises": exercises}
 
