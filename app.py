@@ -7,9 +7,11 @@ No installs needed: standard-library Python only.
 Routes
   GET  /              the web UI (static/index.html)
   GET  /api/status    is the printer queue ready?
-  POST /api/parse     {"text": "..."}                    -> {"store", "items"}
-  POST /api/preview   {"items": [...], "store", "by_aisle"} -> {"rows": [...]}
-  POST /api/print     same body as preview               -> {"ok", "detail"}
+  POST /api/parse     {"mode", "text"}                       -> {"title", "items"}
+  POST /api/preview   {"mode", "title", "items", "options"}  -> {"rows": [...]}
+  POST /api/print     same body as preview                   -> {"ok", "detail"}
+
+Modes: shopping, todo, gym (see receipt/modes.py).
 """
 from __future__ import annotations
 
@@ -21,7 +23,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from receipt import printer, shopping
+from receipt import modes, printer
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
@@ -29,9 +31,7 @@ PORT = int(os.environ.get("PORT", "8787"))
 
 
 def _slip_from(body: dict):
-    items = [str(i).strip() for i in body.get("items", []) if str(i).strip()]
-    store = (body.get("store") or "").strip() or None
-    return shopping.build_slip(items, store, by_aisle=bool(body.get("by_aisle", True)))
+    return modes.get(body.get("mode", "shopping"))["build"](body)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -70,9 +70,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = self._body()
+        try:
+            mode = modes.get(body.get("mode", "shopping"))
+        except KeyError as e:
+            return self._json(400, {"ok": False, "detail": str(e)})
         if self.path == "/api/parse":
-            store, items = shopping.parse(body.get("text", ""))
-            self._json(200, {"store": store, "items": items})
+            self._json(200, mode["parse"](body.get("text", "")))
         elif self.path == "/api/preview":
             self._json(200, {"rows": _slip_from(body).to_preview()})
         elif self.path == "/api/print":

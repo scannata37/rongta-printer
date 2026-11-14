@@ -2,7 +2,15 @@
 
 A tiny local web app for printing to a Rongta 80mm thermal receipt printer from a Mac.
 
-Dictate a shopping list (e.g. with Wispr Flow) and it becomes a clean list grouped by aisle. Then hit **Print**.
+Dictate (e.g. with Wispr Flow), check the list, hit **Print**. There are three modes:
+
+| Mode | Say something like… | Prints |
+|---|---|---|
+| 🛒 **Shopping list** | "Going to Trader Joe's. My list is bananas, milk and mac and cheese." | Checklist grouped by aisle, with the store name |
+| ✅ **To-do** | "Today I need to call the bank, it's urgent, finish my resume and call mom and dad." | Checklist with a PRIORITY section first |
+| 🏋️ **Gym** | "Push day. Bench 3 sets of 8 at 185, tricep pushdowns 3 by 12, 20 minutes on the treadmill." | Workout card with a box and a blank for every set |
+
+Shopping example:
 
 > "I'm going to Trader Joe's. This is my list: bananas, apples, a gallon of milk, some eggs and mac and cheese."
 
@@ -45,7 +53,7 @@ No dependencies: it's just Python 3 (already on your Mac) and the built-in print
 python3 app.py
 ```
 
-Your browser opens at <http://localhost:8787>. Click the text box, dictate, check the list, and print. <kbd>⌘</kbd>+<kbd>Enter</kbd> also prints.
+Your browser opens at <http://localhost:8787>. Pick a mode, click the text box, dictate, check the list, and print. <kbd>⌘</kbd>+<kbd>Enter</kbd> also prints. Each mode keeps its own list, so you can switch tabs without losing anything.
 
 | Setting | How |
 |---|---|
@@ -62,6 +70,8 @@ Your browser opens at <http://localhost:8787>. Click the text box, dictate, chec
 ```
 
 - **`receipt/shopping.py`** parses dictation into items. It's rule-based: it splits on commas, "and" and new lines, drops filler words ("some", "uh", "I need to grab"), spots the store ("going to Market Basket"), and keeps phrases like "mac and cheese" together. It also sorts items into aisles in the order you'd walk the store.
+- **`receipt/todo.py`** strips "I need to / gotta / remember to", marks a task as priority when you say "urgent", "important" or "top priority", and keeps "call mom and dad" as one task. (A one-word piece after "and" gets glued back onto the task before it.)
+- **`receipt/gym.py`** pulls out sets × reps ("3 sets of 8", "3x8", "three by eight"), weight ("at 185", "with 60s", "100 kg") and time ("20 minutes", "1 mile"). Whatever words are left become the exercise name. "Push day", "leg day" and so on become the card title.
 - **`receipt/slip.py`** describes a slip as styled lines (centered, bold, big). The same object renders two ways: to **ESC/POS bytes** for the printer, and to **JSON** for the on-screen preview. So the preview always matches the paper.
 - **`receipt/printer.py`** pipes the bytes to `lp -d Receipt -o raw`. `-o raw` tells macOS not to run the job through a driver, so the printer receives the ESC/POS commands untouched.
 - **Why `setup.sh` uses Apple's Generic driver:** recent macOS refuses "raw" printer queues, so the queue gets a placeholder driver and every job bypasses it with `-o raw`.
@@ -85,6 +95,7 @@ python3 -m unittest discover -s tests -t .
 ## Roadmap
 
 - [x] Shopping list
-- [ ] To-do list
-- [ ] Gym workout card
+- [x] To-do list
+- [x] Gym workout card
+- [ ] Use from your phone
 - [ ] "Print folder" so Claude can drop a file and have it print automatically

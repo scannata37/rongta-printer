@@ -77,46 +77,53 @@
   .toast.show { opacity: 1; transform: translateX(-50%); }
   .toast.err { background: var(--danger); }
   kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: #fff; }
+
+  .items li.ex { flex-wrap: wrap; border-bottom: 1px solid var(--line); padding: 8px 0; }
+  .items li.ex > input.name { flex: 1; font-weight: 600; }
+  .nums { display: flex; gap: 6px; align-items: center; width: 100%; padding-top: 6px; font-size: 13px; color: var(--muted); }
+  .nums input { width: 58px !important; padding: 6px 7px !important; text-align: center; }
+  .nums input.dur { width: 84px !important; }
+  .nums select { font: inherit; font-size: 13px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .star { border: none; background: none; font-size: 19px; cursor: pointer; width: 30px; height: 30px;
+          border-radius: 6px; color: #c9c3b6; flex: none; }
+  .star.on { color: #d79b16; }
+  .star:hover { background: #f6efdc; }
+  .opt { display: none; } .opt.show { display: flex; }
 </style>
 </head>
 <body>
 <header>
   <h1>Receipt Printer <span>· print anything</span></h1>
-  <div id="status" class="pill" title="">
-    <i></i><span>Checking printer…</span>
-  </div>
+  <div id="status" class="pill"><i></i><span>Checking printer…</span></div>
 </header>
 
-<nav class="modes">
-  <button class="mode active">🛒 Shopping list</button>
-  <button class="mode" disabled>✅ To-do <small>soon</small></button>
-  <button class="mode" disabled>🏋️ Gym <small>soon</small></button>
+<nav class="modes" id="modes">
+  <button class="mode" data-mode="shopping">🛒 Shopping list</button>
+  <button class="mode" data-mode="todo">✅ To-do</button>
+  <button class="mode" data-mode="gym">🏋️ Gym</button>
 </nav>
 
 <main>
   <section class="card">
-    <label class="h" for="dictation">Say your list</label>
-    <textarea id="dictation" autofocus
-      placeholder="Click here, then dictate with Wispr Flow. e.g. “I’m going to Trader Joe’s. My list is bananas, apples, a gallon of milk, eggs and mac and cheese.”"></textarea>
-    <div class="hint">Commas, “and”, or new lines all split items. Filler words get dropped. Mention a store (“going to Market Basket”) to put it on the slip.</div>
+    <label class="h" for="dictation" id="dictLabel">Say your list</label>
+    <textarea id="dictation" autofocus></textarea>
+    <div class="hint" id="hint"></div>
 
-    <label class="h" for="store">Store</label>
-    <input id="store" type="text" placeholder="Optional — e.g. Trader Joe's">
+    <label class="h" for="title" id="titleLabel">Title</label>
+    <input id="title" type="text">
 
     <div style="height:22px"></div>
-    <label class="h">Items</label>
+    <label class="h" id="itemsLabel">Items</label>
     <ul id="items" class="items"></ul>
-    <div class="row">
-      <input id="add" type="text" placeholder="Add an item and press Enter">
-    </div>
+    <div class="row"><input id="add" type="text"></div>
 
-    <label class="toggle"><input id="aisle" type="checkbox" checked> Group by aisle</label>
+    <label class="toggle opt" data-for="shopping"><input id="aisle" type="checkbox" checked> Group by aisle</label>
   </section>
 
   <section>
     <div class="paper-wrap"><div id="paper" class="paper"></div></div>
     <div class="actions">
-      <button id="print" class="btn primary">Print list</button>
+      <button id="print" class="btn primary">Print</button>
       <button id="clear" class="btn ghost">Clear</button>
     </div>
     <div class="hint" style="text-align:center"><kbd>⌘</kbd> + <kbd>Enter</kbd> prints</div>
@@ -127,23 +134,103 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-// The list = whatever the dictation box currently parses to, plus items you
-// added by hand. Hand edits and deletions are remembered, so re-parsing the
-// dictation never undoes them.
-const state = { dictated: [], manual: [], removed: new Set(), edits: {}, storeTouched: false };
-const key = (s) => s.trim().toLowerCase();
+const norm = (s) => String(s || "").trim().toLowerCase();
+
+// ---------------------------------------------------------------------------
+// Mode definitions. Each mode says how to label the screen, how to identify
+// an item (key), and how to draw one editable row.
+// ---------------------------------------------------------------------------
+const MODES = {
+  shopping: {
+    dictLabel: "Say your list", itemsLabel: "Items", titleLabel: "Store",
+    titlePh: "Optional — e.g. Trader Joe's", addPh: "Add an item and press Enter",
+    printLabel: "Print list",
+    placeholder: "Click here, then dictate with Wispr Flow. e.g. “I’m going to Trader Joe’s. My list is bananas, apples, a gallon of milk, eggs and mac and cheese.”",
+    hint: "Commas, “and”, or new lines split items. Filler words get dropped. Mention a store (“going to Market Basket”) to put it on the slip.",
+    key: (i) => norm(i), label: (i) => i,
+    fromText: (t) => t[0].toUpperCase() + t.slice(1),
+    row: (item, set) => [textInput(item, (v) => set(v))],
+  },
+  todo: {
+    dictLabel: "Say what you need to do", itemsLabel: "Tasks", titleLabel: "Title",
+    titlePh: "Optional — defaults to TO-DO", addPh: "Add a task and press Enter",
+    printLabel: "Print to-dos",
+    placeholder: "e.g. “Today I need to call the bank, it’s urgent, finish my resume, go to the gym and call mom and dad.”",
+    hint: "Say “urgent”, “important” or “top priority” and the task goes in the PRIORITY section. Tap ★ to change it.",
+    key: (i) => norm(i.text), label: (i) => i.text,
+    fromText: (t) => ({ text: t[0].toUpperCase() + t.slice(1), priority: false }),
+    row: (item, set) => {
+      const star = document.createElement("button");
+      star.className = "star" + (item.priority ? " on" : ""); star.textContent = "★";
+      star.title = item.priority ? "Priority" : "Mark as priority";
+      star.onclick = () => { set({ ...item, priority: !item.priority }); renderItems(); };
+      return [star, textInput(item.text, (v) => set({ ...item, text: v }))];
+    },
+  },
+  gym: {
+    dictLabel: "Say your workout", itemsLabel: "Exercises", titleLabel: "Workout",
+    titlePh: "Optional — e.g. Push day", addPh: "Add an exercise, e.g. “Squat 5x5 at 225”, and press Enter",
+    printLabel: "Print workout",
+    placeholder: "e.g. “Push day. Bench press 3 sets of 8 at 185, incline dumbbell press 3x10 with 60s, tricep pushdowns 3 by 12, and 20 minutes on the treadmill.”",
+    hint: "Say sets × reps (“3 sets of 8”, “3x8”, “3 by 8”), weight (“at 185”, “100 kg”) or time (“20 minutes”). Each set prints a box with a blank to write what you actually did.",
+    key: (i) => norm(i.name), label: (i) => i.name, rowClass: "ex",
+    fromText: (t) => ({ name: t, sets: null, reps: null, weight: null, unit: "lb", duration: null }),
+    row: (item, set) => {
+      let latest = item;   // keep every field edit, not just the last one
+      const upd = (patch) => { latest = { ...latest, ...patch }; set(latest); };
+      const name = textInput(item.name, (v) => upd({ name: v }));
+      name.classList.add("name");
+      const num = (field, ph) => {
+        const i = document.createElement("input"); i.type = "text"; i.inputMode = "decimal";
+        i.placeholder = ph; i.value = item[field] ?? ""; i.title = ph;
+        i.oninput = () => upd({ [field]: i.value === "" ? null : (isNaN(+i.value) ? i.value : +i.value) });
+        return i;
+      };
+      const unit = document.createElement("select");
+      ["lb", "kg"].forEach((u) => unit.add(new Option(u, u, false, (item.unit || "lb") === u)));
+      unit.onchange = () => upd({ unit: unit.value });
+      const dur = document.createElement("input"); dur.type = "text"; dur.className = "dur";
+      dur.placeholder = "time"; dur.title = "e.g. 20 min"; dur.value = item.duration ?? "";
+      dur.oninput = () => upd({ duration: dur.value || null });
+      const nums = document.createElement("div"); nums.className = "nums";
+      nums.append(num("sets", "sets"), "×", num("reps", "reps"), "@", num("weight", "wt"), unit, "or", dur);
+      return [name, "X", nums];   // "X" = where the remove button goes
+    },
+  },
+};
+
+function textInput(value, onInput) {
+  const i = document.createElement("input"); i.type = "text"; i.value = value ?? "";
+  i.oninput = () => onInput(i.value); return i;
+}
+
+// ---------------------------------------------------------------------------
+// State, one bucket per mode. The list = whatever the dictation box parses to,
+// plus items added by hand. Edits and deletions are remembered by item key, so
+// re-parsing the dictation never undoes them.
+// ---------------------------------------------------------------------------
+const fresh = () => ({ text: "", dictated: [], manual: [], removed: new Set(), edits: {},
+                       title: "", parsedTitle: "", titleTouched: false, options: { by_aisle: true } });
+const S = { shopping: fresh(), todo: fresh(), gym: fresh() };
+let mode = "shopping";
+try { if (MODES[localStorage.rpMode]) mode = localStorage.rpMode; } catch {}
+const st = () => S[mode], cfg = () => MODES[mode];
+
 function currentItems() {
-  const out = [], seen = new Set();
-  const push = (orig, src) => {
-    if (state.removed.has(key(orig))) return;
-    const text = state.edits[key(orig)] ?? orig;
-    if (!text.trim() || seen.has(key(text))) return;
-    seen.add(key(text)); out.push({ orig, text, src });
+  const s = st(), c = cfg(), out = [], seen = new Set();
+  const push = (orig) => {
+    const k = c.key(orig);
+    if (s.removed.has(k)) return;
+    const item = k in s.edits ? s.edits[k] : orig;
+    const shown = norm(c.label(item));
+    if (!shown || seen.has(shown)) return;
+    seen.add(shown); out.push({ k, item });
   };
-  state.dictated.forEach((i) => push(i, "d")); state.manual.forEach((i) => push(i, "m"));
+  s.dictated.forEach(push); s.manual.forEach(push);
   return out;
 }
 
+// ---------------------------------------------------------------------------
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {} :
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -155,7 +242,6 @@ function toast(msg, err) {
   clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", 3200);
 }
 
-// ---------- printer status ----------
 async function checkStatus() {
   const pill = $("status");
   try {
@@ -166,33 +252,58 @@ async function checkStatus() {
   } catch { pill.className = "pill bad"; pill.querySelector("span").textContent = "App not running"; }
 }
 
-// ---------- dictation -> items ----------
+// ---------------------------------------------------------------------------
+function switchMode(m) {
+  st().text = $("dictation").value;
+  mode = m; try { localStorage.rpMode = m; } catch {}
+  const c = cfg(), s = st();
+  document.querySelectorAll(".mode").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  document.querySelectorAll(".opt").forEach((o) => o.classList.toggle("show", o.dataset.for === m));
+  $("dictLabel").textContent = c.dictLabel; $("itemsLabel").textContent = c.itemsLabel;
+  $("titleLabel").textContent = c.titleLabel; $("title").placeholder = c.titlePh;
+  $("add").placeholder = c.addPh; $("dictation").placeholder = c.placeholder; $("hint").textContent = c.hint;
+  $("dictation").value = s.text; $("title").value = s.title; $("aisle").checked = s.options.by_aisle;
+  $("print").textContent = c.printLabel;
+  renderItems(); refreshPreview(); $("dictation").focus();
+}
+
 const parseDictation = debounce(async () => {
-  const res = await api("/api/parse", { text: $("dictation").value });
-  if (!state.storeTouched) $("store").value = res.store || "";
-  state.dictated = res.items;
+  const m = mode, s = S[m];
+  s.text = $("dictation").value;
+  const res = await api("/api/parse", { mode: m, text: s.text });
+  if (m !== mode) return;  // switched tabs while waiting
+  if (!s.titleTouched) { s.title = res.title || ""; $("title").value = s.title; }
+  s.dictated = res.items || [];
   renderItems(); refreshPreview();
 }, 350);
 
 function renderItems() {
-  const ul = $("items"); ul.innerHTML = "";
+  const ul = $("items"), c = cfg(), s = st(); ul.innerHTML = "";
   const items = currentItems();
   if (!items.length) {
-    ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add items below.</li>'; return;
+    ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add below.</li>'; return;
   }
-  items.forEach(({ orig, text }) => {
-    const li = document.createElement("li");
-    const inp = document.createElement("input"); inp.type = "text"; inp.value = text;
-    inp.oninput = () => { state.edits[key(orig)] = inp.value; refreshPreview(); };
+  for (const { k, item } of items) {
+    const li = document.createElement("li"); if (c.rowClass) li.className = c.rowClass;
+    const set = (v) => { s.edits[k] = v; refreshPreview(); };
     const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Remove";
-    x.onclick = () => { state.removed.add(key(orig)); renderItems(); refreshPreview(); };
-    li.append(inp, x); ul.append(li);
-  });
+    x.onclick = () => { s.removed.add(k); renderItems(); refreshPreview(); };
+    const parts = c.row(item, set);
+    if (!parts.includes("X")) parts.push("X");
+    li.append(...parts.map((p) => (p === "X" ? x : p)));
+    ul.append(li);
+  }
 }
 
-// ---------- preview ----------
+function payload() {
+  const s = st();
+  return { mode, title: $("title").value, items: currentItems().map((i) => i.item), options: s.options };
+}
+
 const refreshPreview = debounce(async () => {
+  const m = mode;
   const res = await api("/api/preview", payload());
+  if (m !== mode) return;
   const paper = $("paper"); paper.innerHTML = "";
   for (const r of res.rows) {
     const d = document.createElement("div");
@@ -203,38 +314,37 @@ const refreshPreview = debounce(async () => {
   $("print").disabled = !currentItems().length;
 }, 150);
 
-function payload() {
-  return { items: currentItems().map((i) => i.text), store: $("store").value, by_aisle: $("aisle").checked };
-}
-
-// ---------- actions ----------
 async function doPrint() {
   if ($("print").disabled) return;
+  const label = cfg().printLabel;
   $("print").disabled = true; $("print").textContent = "Printing…";
   try {
     const r = await api("/api/print", payload());
     r.ok ? toast("🧾 Sent to printer") : toast("Print failed: " + r.detail, true);
   } catch (e) { toast("Couldn't reach the app — is it still running?", true); }
-  $("print").textContent = "Print list"; refreshPreview();
+  $("print").textContent = label; refreshPreview();
+}
+
+async function addFromBox(e) {
+  if (e.key !== "Enter" || !e.target.value.trim()) return;
+  const text = e.target.value.trim(), m = mode, s = st(), c = cfg();
+  e.target.value = "";
+  const res = await api("/api/parse", { mode: m, text });
+  const items = res.items && res.items.length ? res.items : [c.fromText(text)];
+  for (const it of items) { const k = c.key(it); s.manual.push(it); s.removed.delete(k); delete s.edits[k]; }
+  if (m === mode) { renderItems(); refreshPreview(); }
 }
 
 $("dictation").addEventListener("input", parseDictation);
-$("store").addEventListener("input", () => { state.storeTouched = true; refreshPreview(); });
-$("aisle").addEventListener("change", refreshPreview);
-$("add").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter" || !e.target.value.trim()) return;
-  const v = e.target.value.trim(), item = v[0].toUpperCase() + v.slice(1);
-  state.manual.push(item); state.removed.delete(key(item)); delete state.edits[key(item)];
-  e.target.value = ""; renderItems(); refreshPreview();
-});
+$("title").addEventListener("input", () => { st().title = $("title").value; st().titleTouched = true; refreshPreview(); });
+$("aisle").addEventListener("change", () => { st().options.by_aisle = $("aisle").checked; refreshPreview(); });
+$("add").addEventListener("keydown", addFromBox);
 $("print").onclick = doPrint;
-$("clear").onclick = () => {
-  state.dictated = []; state.manual = []; state.removed.clear(); state.edits = {}; state.storeTouched = false;
-  $("dictation").value = ""; $("store").value = ""; renderItems(); refreshPreview(); $("dictation").focus();
-};
+$("clear").onclick = () => { S[mode] = fresh(); switchMode(mode); };
+document.querySelectorAll(".mode").forEach((b) => b.onclick = () => switchMode(b.dataset.mode));
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) doPrint(); });
 
-renderItems(); refreshPreview(); checkStatus(); setInterval(checkStatus, 15000);
+switchMode(mode); checkStatus(); setInterval(checkStatus, 15000);
 </script>
 </body>
 </html>
