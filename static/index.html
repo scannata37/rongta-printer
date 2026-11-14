@@ -213,9 +213,16 @@ aside { position: sticky; top: 20px; display: grid; gap: 12px; }
            conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x;
                  mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
            conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x; }
-.paper div { white-space: pre; overflow: hidden; min-height: 1.5em; }
-.paper .b { font-weight: 700; } .paper .big { font-size: 22px; line-height: 1.25; }
+.paper div { white-space: pre; overflow: hidden; height: calc(1.5em * var(--h, 1)); }
+.paper div span { display: inline-block; transform: scale(var(--w, 1), var(--h, 1)); transform-origin: left top; }
+.paper div.center span { transform-origin: center top; } .paper div.right span { transform-origin: right top; }
+.paper .b { font-weight: 700; }
 .paper .center { text-align: center; } .paper .right { text-align: right; }
+.sizes { display: flex; align-items: center; gap: 10px; }
+.sizes .lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sizes .seg { flex: 1; display: flex; box-shadow: none; padding: 4px; }
+.sizes .seg button { flex: 1; justify-content: center; padding: 8px 6px; font-size: 13px; }
+.sizes .seg button .aa { font-weight: 800; }
 .actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 .kbd { text-align: center; font-size: 12px; color: var(--muted); }
 kbd { font-family: inherit; font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; background: var(--surface); }
@@ -289,6 +296,15 @@ kbd { font-family: inherit; font-size: 11px; border: 1px solid var(--line); bord
 
   <aside>
     <div class="paper-wrap"><div id="paper" class="paper"></div></div>
+    <div class="sizes">
+      <span class="lbl">Text size</span>
+      <div class="seg" id="sizes">
+        <button data-size="normal" title="Normal: 48 characters per line"><span class="aa" style="font-size:11px">Aa</span> Normal</button>
+        <button data-size="tall" title="Tall: double height, same width"><span class="aa" style="font-size:13px;display:inline-block;transform:scaleY(1.4)">Aa</span> Tall</button>
+        <button data-size="large" title="Large: 2x, 24 characters per line"><span class="aa" style="font-size:15px">Aa</span> Large</button>
+        <button data-size="huge" title="Huge: 3x, 16 characters per line"><span class="aa" style="font-size:18px">Aa</span> Huge</button>
+      </div>
+    </div>
     <div class="actions">
       <button id="print" class="btn btn-primary btn-lg">Print</button>
       <button id="clear" class="btn btn-ghost">Clear</button>
@@ -390,7 +406,13 @@ function textInput(value, onInput) {
 const fresh = () => ({ text: "", dictated: [], manual: [], removed: new Set(), edits: {},
                        title: "", titleTouched: false, options: { by_aisle: true }, picker: null });
 const S = { shopping: fresh(), todo: fresh(), gym: fresh() };
-let mode = "gym", PRESETS = {};
+let mode = "gym", PRESETS = {}, textSize = "normal";
+try { if (["normal","tall","large","huge"].includes(localStorage.slipSize)) textSize = localStorage.slipSize; } catch {}
+function setSize(sz) {
+  textSize = sz; try { localStorage.slipSize = sz; } catch {}
+  document.querySelectorAll("#sizes button").forEach((b) => b.classList.toggle("on", b.dataset.size === sz));
+  refreshPreview();
+}
 try { if (MODES[localStorage.slipMode]) mode = localStorage.slipMode; } catch {}
 const st = () => S[mode], cfg = () => MODES[mode];
 
@@ -574,13 +596,17 @@ function renderLibrary() {
 function payload() {
   const s = st();
   const title = s.picker ? (s.picker.r.title || "") : $("title").value;
-  return { mode, title, items: printableItems(), options: s.options };
+  return { mode, title, items: printableItems(), options: { ...s.options, size: textSize } };
 }
 const refreshPreview = debounce(async () => {
   const m = mode, res = await api("/api/preview", payload());
   if (m !== mode) return;
   const paper = $("paper"); paper.innerHTML = "";
-  for (const r of res.rows) paper.append(el("div", [r.bold && "b", r.big && "big", r.align].filter(Boolean).join(" "), r.text || " "));
+  for (const r of res.rows) {
+    const d = el("div", [r.bold && "b", r.align].filter(Boolean).join(" "));
+    d.style.setProperty("--w", r.w || (r.big ? 2 : 1)); d.style.setProperty("--h", r.h || (r.big ? 2 : 1));
+    d.append(el("span", "", r.text || " ")); paper.append(d);
+  }
 }, 120);
 
 function updateBadges() {
@@ -642,6 +668,8 @@ $("add").addEventListener("keydown", addFromBox);
 $("print").onclick = doPrint;
 $("clear").onclick = () => { S[mode] = fresh(); $("dictation").value = ""; $("title").value = ""; renderAll(); };
 document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => switchMode(b.dataset.mode));
+document.querySelectorAll("#sizes button").forEach((b) => b.onclick = () => setSize(b.dataset.size));
+setSize(textSize);
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) doPrint(); });
 
 api("/api/presets").then((p) => { PRESETS = p; renderAll(); }).catch(() => {});

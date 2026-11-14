@@ -159,8 +159,8 @@ def describe(ex: dict) -> str:
 
 
 def build_slip(exercises: List[dict], title: Optional[str] = None,
-               now: Optional[dt.datetime] = None) -> Slip:
-    slip = Slip()
+               now: Optional[dt.datetime] = None, size: str = "normal") -> Slip:
+    slip = Slip(size=size)
     slip.add((title or "WORKOUT").upper(), align="center", big=True, bold=True)
     slip.add(date_line(now), align="center")
     slip.divider()
@@ -182,9 +182,10 @@ def build_slip(exercises: List[dict], title: Optional[str] = None,
             sets = 0
         rest = ("rest " + str(ex["rest"])) if ex.get("rest") else ""
         if sets > 0 and not ex.get("duration"):
-            # one box + blank per set; 4 fit on a 48-char line
+            # one box + blank per set; as many per line as fit (4 at normal size)
+            per = max(1, (slip.width + 2) // 10)
             boxes = ["[ ] ____  "] * min(sets, 12)
-            lines = ["".join(boxes[j:j + 4]).rstrip() for j in range(0, len(boxes), 4)]
+            lines = ["".join(boxes[j:j + per]).rstrip() for j in range(0, len(boxes), per)]
         else:
             lines = ["[ ] done"]
         last = lines[-1]

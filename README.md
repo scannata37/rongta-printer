@@ -26,6 +26,19 @@ Voice shortcuts still work: "today's push", "today's legs", "my daily routine".
 
 All of it lives in **`receipt/presets.py`** as plain data, with the reasoning written at the top. Edit it to make it yours.
 
+### Text size
+
+Under the preview, choose **Normal**, **Tall**, **Large** or **Huge**. The preview shows the real size, and the choice is remembered.
+
+| Size | What prints | Characters per line |
+|---|---|---|
+| Normal | regular text | 48 |
+| Tall | double-height letters, same width | 48 |
+| Large | 2x width and height | 24 |
+| Huge | 3x width and height | 16 |
+
+Thermal printers only scale in whole steps (1x, 2x, 3x…), so there's no 1.5x. Titles always print one step bigger than the body. Long lines re-wrap to fit each size.
+
 ### Three looks
 
 Switch in the top-right corner (your choice is remembered):
@@ -107,7 +120,7 @@ Your browser opens at <http://localhost:8787>. Pick a mode, click the text box, 
 | `ESC @` | reset printer |
 | `ESC a n` | align: 0 left, 1 center, 2 right |
 | `ESC E n` | bold on/off |
-| `GS ! 0x11` | double width + height (`0x00` = normal) |
+| `GS ! n` | text size: high 4 bits = width - 1, low 4 bits = height - 1 (`0x00` normal, `0x01` tall, `0x11` 2x, `0x22` 3x) |
 | `GS V 0` | cut paper |
 
 ## Tests
@@ -123,5 +136,6 @@ python3 -m unittest discover -s tests -t .
 - [x] Gym workout card
 - [x] Point-and-click templates: PPL A/B, 1-3-5, Ivy Lee, grocery baskets
 - [x] Three switchable designs
+- [x] Text size picker (Normal / Tall / Large / Huge)
 - [ ] Use from your phone
 - [ ] "Print folder" so Claude can drop a file and have it print automatically

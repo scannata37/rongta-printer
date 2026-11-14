@@ -5,6 +5,7 @@ which mode they're talking to:
 
   parse(text)  -> {"title": str|None, "items": [...]}
   build(data)  -> Slip       data = {"title", "items", "options"}
+                             options.size = normal | tall | large | huge
 
 To add a new mode: write a module with parse + build_slip, then register it here.
 """
@@ -21,16 +22,20 @@ def _shopping_parse(text: str) -> dict:
     return {"title": store, "items": items}
 
 
+def _size(d: dict) -> str:
+    return str((d.get("options") or {}).get("size") or "normal")
+
+
 def _shopping_build(d: dict) -> Slip:
     items = [str(i).strip() for i in d.get("items", []) if str(i).strip()]
     by_aisle = (d.get("options") or {}).get("by_aisle", True)
-    return shopping.build_slip(items, d.get("title") or None, by_aisle=bool(by_aisle))
+    return shopping.build_slip(items, d.get("title") or None, by_aisle=bool(by_aisle), size=_size(d))
 
 
 def _todo_build(d: dict) -> Slip:
     items = [i for i in d.get("items", [])
              if i.get("blank") or str(i.get("text", "")).strip()]
-    return todo.build_slip(items, d.get("title") or None)
+    return todo.build_slip(items, d.get("title") or None, size=_size(d))
 
 
 def _gym_parse(text: str) -> dict:
@@ -40,7 +45,7 @@ def _gym_parse(text: str) -> dict:
 
 def _gym_build(d: dict) -> Slip:
     items = [i for i in d.get("items", []) if str(i.get("name", "")).strip()]
-    return gym.build_slip(items, d.get("title") or None)
+    return gym.build_slip(items, d.get("title") or None, size=_size(d))
 
 
 MODES: Dict[str, Dict[str, Callable]] = {

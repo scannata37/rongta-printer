@@ -176,9 +176,10 @@ def group(items: List[str]) -> List[Tuple[str, List[str]]]:
 # ---------------------------------------------------------------------------
 
 def build_slip(items: List[str], store: Optional[str] = None,
-               by_aisle: bool = True, now: Optional[dt.datetime] = None) -> Slip:
+               by_aisle: bool = True, now: Optional[dt.datetime] = None,
+               size: str = "normal") -> Slip:
     now = now or dt.datetime.now()
-    slip = Slip()
+    slip = Slip(size=size)
     slip.add("SHOPPING LIST", align="center", big=True, bold=True)
     if store:
         slip.add(store, align="center", bold=True)

@@ -85,8 +85,8 @@ def parse(text: str) -> dict:
 
 
 def build_slip(items: List[dict], title: Optional[str] = None,
-               now: Optional[dt.datetime] = None) -> Slip:
-    slip = Slip()
+               now: Optional[dt.datetime] = None, size: str = "normal") -> Slip:
+    slip = Slip(size=size)
     slip.add((title or "TO-DO").upper(), align="center", big=True, bold=True)
     slip.add(date_line(now), align="center")
     slip.divider()
