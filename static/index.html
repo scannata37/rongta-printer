@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipt Printer</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --ink: #1d1c1a; --muted: #77736b; --line: #e2ddd2;
+    --card: #fffdf8; --accent: #2f6f4f; --accent-ink: #fff; --danger: #b4432f;
+    --paper: #fff; --radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); }
+  header { display: flex; align-items: center; justify-content: space-between;
+           padding: 18px 28px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  .pill { font-size: 13px; padding: 5px 11px; border-radius: 99px; background: #eee;
+          color: var(--muted); display: inline-flex; gap: 7px; align-items: center; cursor: default; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #bbb; }
+  .pill.ok i { background: #3aa66b; } .pill.bad i { background: var(--danger); }
+
+  .modes { display: flex; gap: 10px; padding: 18px 28px 0; flex-wrap: wrap; }
+  .mode { border: 1px solid var(--line); background: var(--card); border-radius: 10px;
+          padding: 9px 14px; font-size: 14px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .mode.active { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .mode[disabled] { opacity: .45; cursor: not-allowed; }
+  .mode small { font-size: 11px; color: var(--muted); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 24px;
+         padding: 18px 28px 40px; max-width: 1180px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  label.h { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  textarea { width: 100%; min-height: 130px; resize: vertical; font: inherit; font-size: 16px;
+             line-height: 1.45; padding: 14px; border: 1px solid var(--line); border-radius: 10px;
+             background: #fff; color: var(--ink); }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .hint { font-size: 13px; color: var(--muted); margin: 8px 0 22px; }
+  .row { display: flex; gap: 12px; align-items: center; }
+  input[type=text] { font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--line);
+                     border-radius: 8px; background: #fff; width: 100%; color: var(--ink); }
+  .items { list-style: none; margin: 0 0 10px; padding: 0; }
+  .items li { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
+  .items li input { padding: 7px 10px; }
+  .x { border: none; background: none; color: var(--muted); font-size: 20px; cursor: pointer;
+       width: 30px; height: 30px; border-radius: 6px; flex: none; }
+  .x:hover { background: #f3e3df; color: var(--danger); }
+  .empty { color: var(--muted); font-size: 14px; padding: 10px 0 14px; }
+  .toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-top: 18px; cursor: pointer; }
+  button.btn { font: inherit; font-size: 15px; font-weight: 600; border: none; border-radius: 10px;
+               padding: 12px 18px; cursor: pointer; }
+  .primary { background: var(--accent); color: var(--accent-ink); flex: 1; }
+  .primary:disabled { opacity: .5; cursor: not-allowed; }
+  .ghost { background: transparent; border: 1px solid var(--line) !important; color: var(--ink); }
+
+  .paper-wrap { background: #e9e4d8; border-radius: var(--radius); padding: 22px 0 0;
+                display: flex; justify-content: center; overflow: hidden; }
+  .paper { width: 360px; background: var(--paper); padding: 18px 12px 26px; min-height: 260px;
+           font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.2px; line-height: 1.5;
+           box-shadow: 0 2px 10px rgba(0,0,0,.08);
+           -webkit-mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
+             conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x;
+                   mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
+             conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x; }
+  .paper div { white-space: pre; overflow: hidden; min-height: 1.5em; }
+  .paper .b { font-weight: 700; }
+  .paper .big { font-size: 22.4px; line-height: 1.25; }
+  .paper .center { text-align: center; } .paper .right { text-align: right; }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+           background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px;
+           opacity: 0; transition: .2s; pointer-events: none; max-width: 90vw; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  .toast.err { background: var(--danger); }
+  kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: #fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Receipt Printer <span>· print anything</span></h1>
+  <div id="status" class="pill" title="">
+    <i></i><span>Checking printer…</span>
+  </div>
+</header>
+
+<nav class="modes">
+  <button class="mode active">🛒 Shopping list</button>
+  <button class="mode" disabled>✅ To-do <small>soon</small></button>
+  <button class="mode" disabled>🏋️ Gym <small>soon</small></button>
+</nav>
+
+<main>
+  <section class="card">
+    <label class="h" for="dictation">Say your list</label>
+    <textarea id="dictation" autofocus
+      placeholder="Click here, then dictate with Wispr Flow. e.g. “I’m going to Trader Joe’s. My list is bananas, apples, a gallon of milk, eggs and mac and cheese.”"></textarea>
+    <div class="hint">Commas, “and”, or new lines all split items. Filler words get dropped. Mention a store (“going to Market Basket”) to put it on the slip.</div>
+
+    <label class="h" for="store">Store</label>
+    <input id="store" type="text" placeholder="Optional — e.g. Trader Joe's">
+
+    <div style="height:22px"></div>
+    <label class="h">Items</label>
+    <ul id="items" class="items"></ul>
+    <div class="row">
+      <input id="add" type="text" placeholder="Add an item and press Enter">
+    </div>
+
+    <label class="toggle"><input id="aisle" type="checkbox" checked> Group by aisle</label>
+  </section>
+
+  <section>
+    <div class="paper-wrap"><div id="paper" class="paper"></div></div>
+    <div class="actions">
+      <button id="print" class="btn primary">Print list</button>
+      <button id="clear" class="btn ghost">Clear</button>
+    </div>
+    <div class="hint" style="text-align:center"><kbd>⌘</kbd> + <kbd>Enter</kbd> prints</div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// The list = whatever the dictation box currently parses to, plus items you
+// added by hand. Hand edits and deletions are remembered, so re-parsing the
+// dictation never undoes them.
+const state = { dictated: [], manual: [], removed: new Set(), edits: {}, storeTouched: false };
+const key = (s) => s.trim().toLowerCase();
+function currentItems() {
+  const out = [], seen = new Set();
+  const push = (orig, src) => {
+    if (state.removed.has(key(orig))) return;
+    const text = state.edits[key(orig)] ?? orig;
+    if (!text.trim() || seen.has(key(text))) return;
+    seen.add(key(text)); out.push({ orig, text, src });
+  };
+  state.dictated.forEach((i) => push(i, "d")); state.manual.forEach((i) => push(i, "m"));
+  return out;
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return r.json();
+}
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function toast(msg, err) {
+  const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", 3200);
+}
+
+// ---------- printer status ----------
+async function checkStatus() {
+  const pill = $("status");
+  try {
+    const s = await api("/api/status");
+    pill.className = "pill " + (s.ok ? "ok" : "bad");
+    pill.querySelector("span").textContent = s.ok ? `${s.printer} ready` : `${s.printer} not found`;
+    pill.title = s.detail || "";
+  } catch { pill.className = "pill bad"; pill.querySelector("span").textContent = "App not running"; }
+}
+
+// ---------- dictation -> items ----------
+const parseDictation = debounce(async () => {
+  const res = await api("/api/parse", { text: $("dictation").value });
+  if (!state.storeTouched) $("store").value = res.store || "";
+  state.dictated = res.items;
+  renderItems(); refreshPreview();
+}, 350);
+
+function renderItems() {
+  const ul = $("items"); ul.innerHTML = "";
+  const items = currentItems();
+  if (!items.length) {
+    ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add items below.</li>'; return;
+  }
+  items.forEach(({ orig, text }) => {
+    const li = document.createElement("li");
+    const inp = document.createElement("input"); inp.type = "text"; inp.value = text;
+    inp.oninput = () => { state.edits[key(orig)] = inp.value; refreshPreview(); };
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Remove";
+    x.onclick = () => { state.removed.add(key(orig)); renderItems(); refreshPreview(); };
+    li.append(inp, x); ul.append(li);
+  });
+}
+
+// ---------- preview ----------
+const refreshPreview = debounce(async () => {
+  const res = await api("/api/preview", payload());
+  const paper = $("paper"); paper.innerHTML = "";
+  for (const r of res.rows) {
+    const d = document.createElement("div");
+    d.textContent = r.text || " ";
+    d.className = [r.bold && "b", r.big && "big", r.align].filter(Boolean).join(" ");
+    paper.append(d);
+  }
+  $("print").disabled = !currentItems().length;
+}, 150);
+
+function payload() {
+  return { items: currentItems().map((i) => i.text), store: $("store").value, by_aisle: $("aisle").checked };
+}
+
+// ---------- actions ----------
+async function doPrint() {
+  if ($("print").disabled) return;
+  $("print").disabled = true; $("print").textContent = "Printing…";
+  try {
+    const r = await api("/api/print", payload());
+    r.ok ? toast("🧾 Sent to printer") : toast("Print failed: " + r.detail, true);
+  } catch (e) { toast("Couldn't reach the app — is it still running?", true); }
+  $("print").textContent = "Print list"; refreshPreview();
+}
+
+$("dictation").addEventListener("input", parseDictation);
+$("store").addEventListener("input", () => { state.storeTouched = true; refreshPreview(); });
+$("aisle").addEventListener("change", refreshPreview);
+$("add").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.value.trim()) return;
+  const v = e.target.value.trim(), item = v[0].toUpperCase() + v.slice(1);
+  state.manual.push(item); state.removed.delete(key(item)); delete state.edits[key(item)];
+  e.target.value = ""; renderItems(); refreshPreview();
+});
+$("print").onclick = doPrint;
+$("clear").onclick = () => {
+  state.dictated = []; state.manual = []; state.removed.clear(); state.edits = {}; state.storeTouched = false;
+  $("dictation").value = ""; $("store").value = ""; renderItems(); refreshPreview(); $("dictation").focus();
+};
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) doPrint(); });
+
+renderItems(); refreshPreview(); checkStatus(); setInterval(checkStatus, 15000);
+</script>
+</body>
+</html>
