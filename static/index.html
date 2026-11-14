@@ -108,6 +108,21 @@
   .chip:hover { border-color: var(--accent); }
   .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .chip small { opacity: .7; margin-left: 4px; }
+  .routine.open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: #f3f8f4; }
+  .picker { border: 1px solid var(--accent); border-radius: 12px; background: #fff; padding: 14px 16px; margin-top: 12px; }
+  .picker-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .picker-head b { font-size: 16px; }
+  .picker-head .links button { font: inherit; font-size: 13px; border: none; background: none; color: var(--accent);
+                               cursor: pointer; padding: 2px 6px; }
+  .pick { display: flex; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid #f0ece3;
+          cursor: pointer; font-size: 15px; user-select: none; }
+  .pick:last-child { border-bottom: none; }
+  .pick input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; cursor: pointer; }
+  .pick .nm { flex: 1; } .pick .nt { font-size: 13px; color: var(--muted); }
+  .pick.off .nm { color: var(--muted); text-decoration: line-through; }
+  .picker-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .picker-actions .btn { padding: 10px 16px; font-size: 14px; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -234,7 +249,7 @@ function textInput(value, onInput) {
 // re-parsing the dictation never undoes them.
 // ---------------------------------------------------------------------------
 const fresh = () => ({ text: "", dictated: [], manual: [], removed: new Set(), edits: {},
-                       title: "", parsedTitle: "", titleTouched: false, options: { by_aisle: true } });
+                       title: "", parsedTitle: "", titleTouched: false, options: { by_aisle: true }, picker: null });
 const S = { shopping: fresh(), todo: fresh(), gym: fresh() };
 let mode = "shopping";
 try { if (MODES[localStorage.rpMode]) mode = localStorage.rpMode; } catch {}
@@ -260,11 +275,56 @@ function currentItems() {
 // ---------------------------------------------------------------------------
 let PRESETS = {};
 
-function loadRoutine(r) {
-  const items = r.exercises || r.items;
-  S[mode] = { ...fresh(), manual: items.map((i) => ({ ...i })), title: r.title };
+// Tapping a routine opens it as a checklist, every item ticked. Untick what
+// you're skipping, then Print. The preview and Print button follow the ticks.
+function openPicker(key, r) {
+  const s = st();
+  if (s.picker && s.picker.key === key) return closePicker();
+  s.picker = { key, r, off: new Set() };
+  $("title").value = r.title;
+  renderItems(); refreshPreview();
+}
+function closePicker() {
+  const s = st(); s.picker = null; $("title").value = s.title;
+  renderItems(); refreshPreview();
+}
+function pickerItems() {
+  const p = st().picker; if (!p) return [];
+  return (p.r.exercises || p.r.items).filter((_, i) => !p.off.has(i));
+}
+function pickerToList() {   // "Edit as list": move the ticked items into the editor
+  const p = st().picker, items = pickerItems().map((i) => ({ ...i }));
+  S[mode] = { ...fresh(), manual: items, title: p.r.title };
   switchMode(mode);
-  toast(`${r.emoji || ""} Loaded ${r.label} — edit anything, then print`);
+}
+
+function renderPicker() {
+  const s = st(), p = s.picker, c = cfg(), all = p.r.exercises || p.r.items;
+  const box = document.createElement("div"); box.className = "picker";
+  const head = document.createElement("div"); head.className = "picker-head";
+  head.innerHTML = '<b></b><span class="links"><button data-a="all">All</button><button data-a="none">None</button></span>';
+  head.querySelector("b").textContent = `${p.r.emoji} ${p.r.title}`;
+  head.querySelector("[data-a=all]").onclick = () => { p.off.clear(); renderItems(); refreshPreview(); };
+  head.querySelector("[data-a=none]").onclick = () => { all.forEach((_, i) => p.off.add(i)); renderItems(); refreshPreview(); };
+  box.append(head);
+  all.forEach((it, i) => {
+    const row = document.createElement("label"); row.className = "pick" + (p.off.has(i) ? " off" : "");
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !p.off.has(i);
+    cb.onchange = () => { cb.checked ? p.off.delete(i) : p.off.add(i);
+                          row.classList.toggle("off", !cb.checked); refreshPreview(); };
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = c.label(it);
+    const nt = document.createElement("span"); nt.className = "nt"; nt.textContent = (c.chipNote && c.chipNote(it)) || "";
+    row.append(cb, nm, nt); box.append(row);
+  });
+  const act = document.createElement("div"); act.className = "picker-actions";
+  const pr = document.createElement("button"); pr.className = "btn primary"; pr.textContent = "Print " + p.r.label;
+  pr.onclick = doPrint;
+  const ed = document.createElement("button"); ed.className = "btn ghost"; ed.textContent = "Edit as list";
+  ed.onclick = pickerToList;
+  const cl = document.createElement("button"); cl.className = "btn ghost"; cl.textContent = "Close";
+  cl.onclick = closePicker;
+  act.append(pr, ed, cl); box.append(act);
+  return box;
 }
 
 function toggleChip(item) {
@@ -285,7 +345,9 @@ function renderPresets() {
     b.innerHTML = `<b></b><span></span>`;
     b.querySelector("b").textContent = `${r.emoji} ${r.label}`;
     b.querySelector("span").textContent = r.blurb;
-    b.onclick = () => loadRoutine(r); grid.append(b);
+    const key = Object.keys(p.routines).find((k) => p.routines[k] === r);
+    if (st().picker && st().picker.key === key) b.classList.add("open");
+    b.onclick = () => openPicker(key, r); grid.append(b);
   }
   const det = document.createElement("details"); det.className = "lib";
   if (sessionStorage.getItem("lib-" + mode) === "1") det.open = true;
@@ -308,7 +370,9 @@ function renderPresets() {
     }
     groups.append(wrap);
   }
-  box.append(lab, grid, det);
+  box.append(lab, grid);
+  if (st().picker) box.append(renderPicker());
+  box.append(det);
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +407,7 @@ function switchMode(m) {
   $("dictLabel").textContent = c.dictLabel; $("itemsLabel").textContent = c.itemsLabel;
   $("titleLabel").textContent = c.titleLabel; $("title").placeholder = c.titlePh;
   $("add").placeholder = c.addPh; $("dictation").placeholder = c.placeholder; $("hint").textContent = c.hint;
-  $("dictation").value = s.text; $("title").value = s.title; $("aisle").checked = s.options.by_aisle;
+  $("dictation").value = s.text; $("title").value = s.picker ? s.picker.r.title : s.title; $("aisle").checked = s.options.by_aisle;
   $("print").textContent = c.printLabel;
   renderItems(); refreshPreview(); $("dictation").focus();
 }
@@ -351,6 +415,7 @@ function switchMode(m) {
 const parseDictation = debounce(async () => {
   const m = mode, s = S[m];
   s.text = $("dictation").value;
+  if (s.picker && s.text.trim()) { s.picker = null; $("title").value = s.title; }
   const res = await api("/api/parse", { mode: m, text: s.text });
   if (m !== mode) return;  // switched tabs while waiting
   if (!s.titleTouched) { s.title = res.title || ""; $("title").value = s.title; }
@@ -361,6 +426,10 @@ const parseDictation = debounce(async () => {
 function renderItems() {
   const ul = $("items"), c = cfg(), s = st(); ul.innerHTML = "";
   renderPresets();
+  const picking = !!s.picker;
+  ["itemsLabel", "items", "add"].forEach((id) => $(id).classList.toggle("hidden", picking));
+  document.querySelectorAll("details.lib").forEach((d) => d.classList.toggle("hidden", picking));
+  if (picking) return;
   const items = currentItems();
   if (!items.length) {
     ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add below.</li>'; return;
@@ -379,7 +448,8 @@ function renderItems() {
 
 function payload() {
   const s = st();
-  return { mode, title: $("title").value, items: currentItems().map((i) => i.item), options: s.options };
+  const items = s.picker ? pickerItems() : currentItems().map((i) => i.item);
+  return { mode, title: $("title").value, items, options: s.options };
 }
 
 const refreshPreview = debounce(async () => {
@@ -393,11 +463,11 @@ const refreshPreview = debounce(async () => {
     d.className = [r.bold && "b", r.big && "big", r.align].filter(Boolean).join(" ");
     paper.append(d);
   }
-  $("print").disabled = !currentItems().length;
+  $("print").disabled = !(st().picker ? pickerItems().length : currentItems().length);
 }, 150);
 
 async function doPrint() {
-  if ($("print").disabled) return;
+  if (!payload().items.length) return toast("Nothing ticked to print.", true);
   const label = cfg().printLabel;
   $("print").disabled = true; $("print").textContent = "Printing…";
   try {
