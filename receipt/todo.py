@@ -45,7 +45,7 @@ def parse(text: str) -> dict:
     if m:
         phrase = m.group(1).lower()
         key = "daily" if phrase.startswith("daily") else ("reset" if "reset" in phrase else "deep")
-        preset = [{"text": t, "priority": False} for t in TODO_ROUTINES[key]["items"]]
+        preset = [dict(t) for t in TODO_ROUTINES[key]["items"]]
         text = text[:m.start()] + text[m.end():]
     head, sep, tail = text.partition(":")
     # "My to-do list for today: ..." -> keep what follows the colon
@@ -91,19 +91,46 @@ def build_slip(items: List[dict], title: Optional[str] = None,
     slip.add(date_line(now), align="center")
     slip.divider()
 
-    top = [i for i in items if i.get("priority")]
-    rest = [i for i in items if not i.get("priority")]
-    if top:
-        slip.add("PRIORITY", bold=True)
-        for it in top:
-            slip.add("[ ] " + it["text"], bold=True, indent=4)
-        if rest:
+    def line(it: dict, bold: bool = False):
+        if it.get("blank"):
+            # an empty line to fill in by hand
+            prefix = ("%d. " % it["num"]) if it.get("num") else "[ ] "
+            slip.add(prefix + "_" * (slip.width - len(prefix)))
             slip.blank()
-            slip.add("EVERYTHING ELSE", bold=True)
-    for it in rest:
-        slip.add("[ ] " + it["text"], indent=4)
+        else:
+            slip.add("[ ] " + it["text"], bold=bold, indent=4)
+
+    if any(it.get("section") for it in items):
+        # Template sheets (1-3-5, Ivy Lee): print each section in order.
+        first, current = True, None
+        for it in items:
+            sec = it.get("section")
+            if first or sec != current:
+                if not first and slip.lines[-1].text:
+                    slip.blank()
+                first = False
+                if sec:
+                    slip.add(sec, bold=True)
+                current = sec
+            line(it, bold=bool(it.get("priority")))
+    else:
+        top = [i for i in items if i.get("priority")]
+        rest = [i for i in items if not i.get("priority")]
+        if top:
+            slip.add("PRIORITY", bold=True)
+            for it in top:
+                line(it, bold=True)
+            if rest:
+                slip.blank()
+                slip.add("EVERYTHING ELSE", bold=True)
+        for it in rest:
+            line(it)
 
     slip.divider()
-    n = len(items)
-    slip.add("%d task%s - you got this" % (n, "" if n == 1 else "s"), align="center")
+    real = [i for i in items if not i.get("blank")]
+    if real:
+        n = len(real)
+        slip.add("%d task%s - you got this" % (n, "" if n == 1 else "s"), align="center")
+    else:
+        slip.add("Fill it in. Start at the top.", align="center")
     return slip

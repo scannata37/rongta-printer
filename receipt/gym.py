@@ -15,7 +15,7 @@ import datetime as dt
 import re
 from typing import List, Optional
 
-from .presets import GYM_ROUTINES
+from .presets import GYM_FOOTER, GYM_ROUTINES
 from .slip import Slip
 from .text import capitalize, date_line, split_chunks, strip_lead, words_to_digits
 
@@ -180,15 +180,25 @@ def build_slip(exercises: List[dict], title: Optional[str] = None,
             sets = int(ex.get("sets") or 0)
         except (TypeError, ValueError):
             sets = 0
+        rest = ("rest " + str(ex["rest"])) if ex.get("rest") else ""
         if sets > 0 and not ex.get("duration"):
             # one box + blank per set; 4 fit on a 48-char line
             boxes = ["[ ] ____  "] * min(sets, 12)
-            for j in range(0, len(boxes), 4):
-                slip.add("".join(boxes[j:j + 4]).rstrip())
+            lines = ["".join(boxes[j:j + 4]).rstrip() for j in range(0, len(boxes), 4)]
         else:
-            slip.add("[ ] done")
+            lines = ["[ ] done"]
+        last = lines[-1]
+        if rest and len(last) + 2 + len(rest) <= slip.width:
+            lines[-1] = last + " " * (slip.width - len(last) - len(rest)) + rest
+            rest = ""
+        for ln in lines:
+            slip.add(ln)
+        if rest:
+            slip.add(rest.rjust(slip.width))
 
     slip.divider()
+    slip.add(GYM_FOOTER)
+    slip.blank()
     slip.add("Notes: " + "_" * (slip.width - 7))
     slip.blank()
     slip.add("_" * slip.width)

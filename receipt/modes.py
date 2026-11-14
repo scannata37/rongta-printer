@@ -28,7 +28,8 @@ def _shopping_build(d: dict) -> Slip:
 
 
 def _todo_build(d: dict) -> Slip:
-    items = [i for i in d.get("items", []) if str(i.get("text", "")).strip()]
+    items = [i for i in d.get("items", [])
+             if i.get("blank") or str(i.get("text", "")).strip()]
     return todo.build_slip(items, d.get("title") or None)
 
 

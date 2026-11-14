@@ -33,10 +33,27 @@ class PresetTests(unittest.TestCase):
 
     def test_presets_payload_shape(self):
         p = presets.all_presets()
-        self.assertEqual(set(p["gym"]["routines"]), {"push", "pull", "legs"})
+        self.assertTrue({"push", "pull", "legs", "push_b", "pull_b", "legs_b"} <= set(p["gym"]["routines"]))
+        self.assertEqual(set(p), {"gym", "todo", "shopping"})
         for group in p["todo"]["library"].values():
             for item in group:
-                self.assertEqual(set(item), {"text", "priority"})
+                self.assertIn("text", item)
+
+    def test_sheets_print_blank_lines(self):
+        from receipt import modes
+        r = presets.all_presets()["todo"]["routines"]["135"]
+        text = modes.get("todo")["build"]({"title": r["title"], "items": r["items"]}).to_text()
+        self.assertEqual(text.count("[ ] ____"), 9)
+        r = presets.all_presets()["todo"]["routines"]["ivy"]
+        text = modes.get("todo")["build"]({"title": r["title"], "items": r["items"]}).to_text()
+        self.assertIn("6. ____", text)
+
+    def test_gym_card_has_rest_and_progression_tip(self):
+        r = gym.parse("today's push")
+        text = gym.build_slip(r["exercises"], r["title"]).to_text()
+        self.assertIn("rest 2-3 min", text)
+        self.assertIn("4 x 5-8", text)
+        self.assertIn("Add", text)
 
 
 if __name__ == "__main__":

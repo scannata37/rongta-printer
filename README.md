@@ -1,4 +1,4 @@
-# Rongta Printer 🧾
+# Slip 🧾 (Rongta receipt printer app)
 
 A tiny local web app for printing to a Rongta 80mm thermal receipt printer from a Mac.
 
@@ -10,11 +10,28 @@ Dictate (e.g. with Wispr Flow), check the list, hit **Print**. There are three m
 | ✅ **To-do** | "Today I need to call the bank, it's urgent, finish my resume and call mom and dad." | Checklist with a PRIORITY section first |
 | 🏋️ **Gym** | "Push day. Bench 3 sets of 8 at 185, tricep pushdowns 3 by 12, 20 minutes on the treadmill." | Workout card with a box and a blank for every set |
 
-### Presets (less typing)
+### Point-and-click templates
 
-- **Gym:** one tap loads a full **Push**, **Pull** or **Legs** day (a classic 3-day split). You can also just say "today's push". Below that, **Add exercises** has about 50 common lifts, core moves and cardio grouped by muscle. Tap to add, tap again to remove.
-- **To-do:** **Daily essentials** (walk 10,000 steps, study AI tools for 2 hours, read, plan tomorrow…), **Deep work day** and **Reset day** routines, plus **Add common tasks** grouped into Health, Learning, Focus, Career and Home. Say "my daily routine" to load it by voice.
-- All presets live in **`receipt/presets.py`**, which is plain data. Edit it to make them yours.
+Every tab starts with templates. Tap one and its items open as a checklist with everything **pre-ticked**. Untick what you're skipping, then **Print**, or choose **Edit as list** to tweak further.
+
+| Tab | Templates | Why |
+|---|---|---|
+| 🏋️ Gym | **Push · Pull · Legs**, each with an **A (strength)** and **B (volume)** day | The standard 6-day PPL layout. A days lead with heavy compound lifts at 5-8 reps and 2-3 min rest; B days use different angles at 8-15 reps and 60-90 s rest. Each card prints rep *ranges*, rest times, and the rule "hit the top of the range on every set → add weight next time." |
+| ✅ To-do | **Daily essentials**, **1-3-5 day**, **Ivy Lee six**, **Deep work day**, **Reset day** | 1-3-5 = one big task, three medium, five small. Ivy Lee = six tasks written the night before, done in order. Those two print as **blank fill-in sheets** for a pen. |
+| 🛒 Shopping | **Weekly staples**, **High-protein**, **Quick run** | Common baskets. Untick what's already in the fridge. |
+
+Under **Build your own**, every tab also has a tap-to-add library: about 50 exercises by muscle, tasks grouped into Health / Learning / Focus / Career / Home, and about 70 groceries by aisle.
+
+Voice shortcuts still work: "today's push", "today's legs", "my daily routine".
+
+All of it lives in **`receipt/presets.py`** as plain data, with the reasoning written at the top. Edit it to make it yours.
+
+### Three looks
+
+Switch in the top-right corner (your choice is remembered):
+- **Studio:** clean and light, with color used only to mean something (orange push, blue pull, purple legs)
+- **Night:** dark gym-app style with a lime accent
+- **Receipt:** black-and-white monospace that matches the paper
 
 Shopping example:
 
@@ -104,6 +121,7 @@ python3 -m unittest discover -s tests -t .
 - [x] Shopping list
 - [x] To-do list
 - [x] Gym workout card
-- [x] Presets: Push/Pull/Legs, daily to-do routines, pick-to-add libraries
+- [x] Point-and-click templates: PPL A/B, 1-3-5, Ivy Lee, grocery baskets
+- [x] Three switchable designs
 - [ ] Use from your phone
 - [ ] "Print folder" so Claude can drop a file and have it print automatically

@@ -1,262 +1,401 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="studio">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Receipt Printer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slip · receipt printer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
 <style>
-  :root {
-    --bg: #f4f1ea; --ink: #1d1c1a; --muted: #77736b; --line: #e2ddd2;
-    --card: #fffdf8; --accent: #2f6f4f; --accent-ink: #fff; --danger: #b4432f;
-    --paper: #fff; --radius: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); }
-  header { display: flex; align-items: center; justify-content: space-between;
-           padding: 18px 28px; border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
-  header h1 span { color: var(--muted); font-weight: 400; }
-  .pill { font-size: 13px; padding: 5px 11px; border-radius: 99px; background: #eee;
-          color: var(--muted); display: inline-flex; gap: 7px; align-items: center; cursor: default; }
-  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #bbb; }
-  .pill.ok i { background: #3aa66b; } .pill.bad i { background: var(--danger); }
+/* =========================================================================
+   Three looks, switchable from the header. Everything visual hangs off these
+   variables, so a theme is just a different set of values.
+   ========================================================================= */
+:root, [data-theme="studio"] {
+  --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f7f8fa; --ink: #0b0d12; --muted: #6b7280;
+  --line: #e6e8ec; --accent: #0b0d12; --accent-ink: #ffffff; --focus: #3e63dd;
+  --radius: 18px; --radius-sm: 12px; --bw: 1px; --shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06);
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --display: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --paper-bg: #e9ebef; --check: #0b0d12; --tpl-tint: .10;
+}
+[data-theme="night"] {
+  --bg: #0a0b0e; --surface: #14161b; --surface-2: #1b1e25; --ink: #f1f3f7; --muted: #8a93a3;
+  --line: #262a33; --accent: #c6ff3d; --accent-ink: #0a0b0e; --focus: #c6ff3d;
+  --radius: 20px; --radius-sm: 12px; --bw: 1px; --shadow: 0 0 0 1px rgba(255,255,255,.02), 0 12px 32px rgba(0,0,0,.45);
+  --paper-bg: #1b1e25; --check: #c6ff3d; --tpl-tint: .18;
+}
+[data-theme="receipt"] {
+  --bg: #ffffff; --surface: #ffffff; --surface-2: #ffffff; --ink: #000000; --muted: #4b4b4b;
+  --line: #000000; --accent: #000000; --accent-ink: #ffffff; --focus: #000000;
+  --radius: 0px; --radius-sm: 0px; --bw: 2px; --shadow: none;
+  --font: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --display: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --paper-bg: #f2f2f2; --check: #000; --tpl-tint: 0;
+}
 
-  .modes { display: flex; gap: 10px; padding: 18px 28px 0; flex-wrap: wrap; }
-  .mode { border: 1px solid var(--line); background: var(--card); border-radius: 10px;
-          padding: 9px 14px; font-size: 14px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
-  .mode.active { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
-  .mode[disabled] { opacity: .45; cursor: not-allowed; }
-  .mode small { font-size: 11px; color: var(--muted); }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font);
+             -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hidden { display: none !important; }
 
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 24px;
-         padding: 18px 28px 40px; max-width: 1180px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
-  label.h { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
-            color: var(--muted); margin: 0 0 8px; font-weight: 600; }
-  textarea { width: 100%; min-height: 130px; resize: vertical; font: inherit; font-size: 16px;
-             line-height: 1.45; padding: 14px; border: 1px solid var(--line); border-radius: 10px;
-             background: #fff; color: var(--ink); }
-  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .hint { font-size: 13px; color: var(--muted); margin: 8px 0 22px; }
-  .row { display: flex; gap: 12px; align-items: center; }
-  input[type=text] { font: inherit; font-size: 15px; padding: 9px 11px; border: 1px solid var(--line);
-                     border-radius: 8px; background: #fff; width: 100%; color: var(--ink); }
-  .items { list-style: none; margin: 0 0 10px; padding: 0; }
-  .items li { display: flex; gap: 8px; align-items: center; padding: 4px 0; }
-  .items li input { padding: 7px 10px; }
-  .x { border: none; background: none; color: var(--muted); font-size: 20px; cursor: pointer;
-       width: 30px; height: 30px; border-radius: 6px; flex: none; }
-  .x:hover { background: #f3e3df; color: var(--danger); }
-  .empty { color: var(--muted); font-size: 14px; padding: 10px 0 14px; }
-  .toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-top: 18px; cursor: pointer; }
-  button.btn { font: inherit; font-size: 15px; font-weight: 600; border: none; border-radius: 10px;
-               padding: 12px 18px; cursor: pointer; }
-  .primary { background: var(--accent); color: var(--accent-ink); flex: 1; }
-  .primary:disabled { opacity: .5; cursor: not-allowed; }
-  .ghost { background: transparent; border: 1px solid var(--line) !important; color: var(--ink); }
+/* ---------- header ---------- */
+.top { display: flex; align-items: center; gap: 16px; padding: 16px 28px; max-width: 1240px; margin: 0 auto; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 800;
+         font-size: 20px; letter-spacing: -.02em; }
+.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
+        display: grid; place-items: center; font-size: 17px; }
+[data-theme="receipt"] .logo { border-radius: 0; }
+.spacer { flex: 1; }
+.pill { font-size: 13px; padding: 7px 12px; border-radius: 99px; background: var(--surface); border: var(--bw) solid var(--line);
+        color: var(--muted); display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+[data-theme="receipt"] .pill { border-radius: 0; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: #c0c4cc; }
+.pill.ok i { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
+.pill.bad i { background: #ef4444; }
+.themes { display: flex; gap: 4px; padding: 4px; background: var(--surface); border: var(--bw) solid var(--line); border-radius: 99px; }
+[data-theme="receipt"] .themes { border-radius: 0; }
+.themes button { border: none; background: none; border-radius: 99px; padding: 6px 11px; font-size: 13px; color: var(--muted);
+                 display: flex; align-items: center; gap: 6px; }
+.themes button.on { background: var(--accent); color: var(--accent-ink); }
+[data-theme="receipt"] .themes button { border-radius: 0; }
+.sw { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(128,128,128,.4); }
 
-  .paper-wrap { background: #e9e4d8; border-radius: var(--radius); padding: 22px 0 0;
-                display: flex; justify-content: center; overflow: hidden; }
-  .paper { width: 360px; background: var(--paper); padding: 18px 12px 26px; min-height: 260px;
-           font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.2px; line-height: 1.5;
-           box-shadow: 0 2px 10px rgba(0,0,0,.08);
-           -webkit-mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
-             conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x;
-                   mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
-             conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x; }
-  .paper div { white-space: pre; overflow: hidden; min-height: 1.5em; }
-  .paper .b { font-weight: 700; }
-  .paper .big { font-size: 22.4px; line-height: 1.25; }
-  .paper .center { text-align: center; } .paper .right { text-align: right; }
-  .actions { display: flex; gap: 10px; margin-top: 16px; }
-  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
-           background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px;
-           opacity: 0; transition: .2s; pointer-events: none; max-width: 90vw; }
-  .toast.show { opacity: 1; transform: translateX(-50%); }
-  .toast.err { background: var(--danger); }
-  kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; background: #fff; }
+/* ---------- mode tabs ---------- */
+.tabs { max-width: 1240px; margin: 4px auto 0; padding: 0 28px; }
+.seg { display: inline-flex; gap: 4px; padding: 5px; background: var(--surface); border: var(--bw) solid var(--line);
+       border-radius: 16px; box-shadow: var(--shadow); }
+[data-theme="receipt"] .seg { border-radius: 0; }
+.seg button { white-space: nowrap; border: none; background: none; padding: 10px 18px; border-radius: 12px; font-weight: 600; font-size: 15px;
+              color: var(--muted); display: flex; align-items: center; gap: 8px; }
+[data-theme="receipt"] .seg button { border-radius: 0; text-transform: uppercase; font-size: 13px; letter-spacing: .04em; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.badge { font-size: 11px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: inline-grid; place-items: center;
+         background: var(--surface-2); color: var(--muted); font-weight: 700; }
+.seg button.on .badge { background: rgba(255,255,255,.2); color: inherit; }
+[data-theme="night"] .seg button.on .badge { background: rgba(0,0,0,.15); }
 
-  .items li.ex { flex-wrap: wrap; border-bottom: 1px solid var(--line); padding: 8px 0; }
-  .items li.ex > input.name { flex: 1; font-weight: 600; }
-  .nums { display: flex; gap: 6px; align-items: center; width: 100%; padding-top: 6px; font-size: 13px; color: var(--muted); }
-  .nums input { width: 58px !important; padding: 6px 7px !important; text-align: center; }
-  .nums input.dur { width: 84px !important; }
-  .nums select { font: inherit; font-size: 13px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-  .star { border: none; background: none; font-size: 19px; cursor: pointer; width: 30px; height: 30px;
-          border-radius: 6px; color: #c9c3b6; flex: none; }
-  .star.on { color: #d79b16; }
-  .star:hover { background: #f6efdc; }
-  .opt { display: none; } .opt.show { display: flex; }
-  #presets { margin: 0 0 22px; }
-  #presets:empty { display: none; }
-  .routines { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .routine { text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 10px;
-             padding: 11px 13px; cursor: pointer; font: inherit; color: var(--ink); }
-  .routine:hover { border-color: var(--accent); background: #f3f8f4; }
-  .routine b { display: block; font-size: 15px; margin-bottom: 2px; }
-  .routine span { font-size: 12px; color: var(--muted); }
-  details.lib { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-  details.lib summary { cursor: pointer; padding: 10px 13px; font-size: 14px; font-weight: 600; }
-  .libgroups { padding: 2px 13px 12px; }
-  .libgroup { margin-top: 8px; }
-  .libgroup h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
-          border-radius: 99px; padding: 5px 11px; cursor: pointer; }
-  .chip:hover { border-color: var(--accent); }
-  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .chip small { opacity: .7; margin-left: 4px; }
-  .routine.open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: #f3f8f4; }
-  .picker { border: 1px solid var(--accent); border-radius: 12px; background: #fff; padding: 14px 16px; margin-top: 12px; }
-  .picker-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-  .picker-head b { font-size: 16px; }
-  .picker-head .links button { font: inherit; font-size: 13px; border: none; background: none; color: var(--accent);
-                               cursor: pointer; padding: 2px 6px; }
-  .pick { display: flex; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid #f0ece3;
-          cursor: pointer; font-size: 15px; user-select: none; }
-  .pick:last-child { border-bottom: none; }
-  .pick input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; cursor: pointer; }
-  .pick .nm { flex: 1; } .pick .nt { font-size: 13px; color: var(--muted); }
-  .pick.off .nm { color: var(--muted); text-decoration: line-through; }
-  .picker-actions { display: flex; gap: 10px; margin-top: 12px; }
-  .picker-actions .btn { padding: 10px 16px; font-size: 14px; }
-  .hidden { display: none !important; }
+/* ---------- layout ---------- */
+main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; max-width: 1240px; margin: 0 auto;
+       padding: 20px 28px 60px; align-items: start; }
+.col { display: grid; gap: 20px; }
+.panel { background: var(--surface); border: var(--bw) solid var(--line); border-radius: var(--radius); padding: 22px;
+         box-shadow: var(--shadow); }
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+h2 { margin: 0; font-family: var(--display); font-size: 18px; letter-spacing: -.01em; }
+[data-theme="receipt"] h2 { text-transform: uppercase; font-size: 15px; letter-spacing: .04em; }
+.sub { margin: 0; color: var(--muted); font-size: 13px; }
+label.h { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--muted); margin: 18px 0 8px; }
+
+/* ---------- templates ---------- */
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.tpl { --c: #888; position: relative; text-align: left; border: var(--bw) solid var(--line); border-radius: var(--radius-sm);
+       background: var(--surface); padding: 14px 14px 13px; display: flex; flex-direction: column; gap: 4px;
+       transition: transform .12s ease, border-color .12s, box-shadow .12s; overflow: hidden; }
+.tpl::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: var(--tpl-tint); pointer-events: none; }
+.tpl:hover { transform: translateY(-1px); border-color: var(--c); }
+.tpl.open { border-color: var(--c); box-shadow: 0 0 0 2px var(--c) inset; }
+[data-theme="receipt"] .tpl.open { background: #000; color: #fff; }
+[data-theme="receipt"] .tpl.open .tpl-sub { color: #ddd; }
+.tpl-top { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; position: relative; }
+.tpl-emoji { font-size: 20px; }
+.tpl-sub { font-size: 12.5px; color: var(--muted); position: relative; }
+.tpl-tag { position: relative; align-self: flex-start; margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+           text-transform: uppercase; padding: 3px 8px; border-radius: 99px; background: var(--c); color: #fff; }
+[data-theme="receipt"] .tpl-tag { border-radius: 0; background: #000; }
+/* grouped (Push / Pull / Legs): one card, two buttons */
+.tpl-group { --c: #888; border: var(--bw) solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.tpl-group-head { padding: 14px 14px 10px; position: relative; }
+.tpl-group-head::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: var(--tpl-tint); }
+.tpl-group-head > * { position: relative; }
+.tpl-group-head .tpl-top { font-size: 18px; }
+.tpl-group-btns { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--bw) solid var(--line); }
+.tpl-group-btns button { border: none; background: var(--surface); padding: 11px 10px; text-align: left; font-size: 13px; line-height: 1.25; }
+.tpl-group-btns button + button { border-left: var(--bw) solid var(--line); }
+.tpl-group-btns button b { display: block; font-size: 14px; }
+.tpl-group-btns button span { color: var(--muted); font-size: 12px; }
+.tpl-group-btns button:hover { background: var(--surface-2); }
+.tpl-group-btns button.open { background: var(--c); color: #fff; }
+.tpl-group-btns button.open span { color: rgba(255,255,255,.85); }
+[data-theme="receipt"] .tpl-group-btns button.open { background: #000; }
+[data-theme="receipt"] .tpl-group-btns button b { font-size: 12px; white-space: nowrap; }
+
+/* ---------- picker ---------- */
+.picker { --c: #888; margin-top: 16px; border: var(--bw) solid var(--c); border-radius: var(--radius-sm); overflow: hidden; }
+[data-theme="receipt"] .picker { border-color: #000; }
+.picker-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: var(--bw) solid var(--line); position: relative; }
+.picker-head::before { content: ""; position: absolute; inset: 0; background: var(--c); opacity: var(--tpl-tint); }
+.picker-head > * { position: relative; }
+.picker-head .ttl { font-weight: 800; font-size: 17px; flex: 1; }
+.picker-head .cnt { font-size: 13px; color: var(--muted); }
+.linkbtn { border: none; background: none; font-size: 13px; font-weight: 600; color: var(--ink); padding: 4px 6px; text-decoration: underline;
+           text-underline-offset: 3px; text-decoration-color: var(--muted); }
+.pick { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
+.pick:last-of-type { border-bottom: none; }
+.pick:hover { background: var(--surface-2); }
+.pick input { position: absolute; opacity: 0; pointer-events: none; }
+.box { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--line); flex: none; display: grid; place-items: center;
+       transition: .12s; background: var(--surface); }
+[data-theme="receipt"] .box { border-radius: 0; border-color: #000; }
+.pick input:checked + .box { background: var(--check); border-color: var(--check); }
+.pick input:checked + .box::after { content: ""; width: 6px; height: 11px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0;
+                                     transform: translateY(-1px) rotate(45deg); }
+[data-theme="studio"] .pick input:checked + .box { background: var(--c); border-color: var(--c); }
+[data-theme="studio"] .pick input:checked + .box::after { border-color: #fff; }
+.pick .nm { flex: 1; font-size: 15px; font-weight: 500; }
+.pick .nt { font-size: 12.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.pick.off .nm { color: var(--muted); text-decoration: line-through; }
+.picker-foot { display: flex; gap: 10px; padding: 14px 16px; background: var(--surface-2); border-top: var(--bw) solid var(--line); flex-wrap: wrap; }
+
+/* ---------- buttons ---------- */
+.btn { border: var(--bw) solid transparent; border-radius: 12px; padding: 12px 18px; font-weight: 700; font-size: 15px; transition: .12s; }
+[data-theme="receipt"] .btn { border-radius: 0; text-transform: uppercase; font-size: 13px; letter-spacing: .05em; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-lg { width: 100%; padding: 16px; font-size: 16px; }
+
+/* ---------- inputs ---------- */
+textarea, input[type=text] { width: 100%; border: var(--bw) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2);
+                             padding: 12px 14px; font-size: 15px; transition: border-color .12s, background .12s; }
+textarea { min-height: 96px; resize: vertical; line-height: 1.45; font-size: 16px; }
+textarea:focus, input[type=text]:focus { outline: none; border-color: var(--focus); background: var(--surface); }
+::placeholder { color: var(--muted); opacity: .8; }
+.say { position: relative; }
+.say .mic { position: absolute; right: 12px; bottom: 12px; font-size: 12px; color: var(--muted); pointer-events: none; }
+
+/* ---------- list editor ---------- */
+.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.items li { display: flex; gap: 8px; align-items: center; }
+.items li > input[type=text] { padding: 9px 12px; background: var(--surface); }
+.items li.ex { flex-wrap: wrap; padding: 10px; border: var(--bw) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
+.items li.ex > input.name { flex: 1; font-weight: 600; }
+.nums { display: flex; gap: 6px; align-items: center; width: 100%; padding-top: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.nums input[type=text] { width: 62px; padding: 7px 8px; text-align: center; background: var(--surface); }
+.nums input.wide { width: 90px; }
+.nums select { padding: 6px; border: var(--bw) solid var(--line); border-radius: 8px; background: var(--surface); }
+.x { border: none; background: none; color: var(--muted); font-size: 20px; width: 32px; height: 32px; border-radius: 8px; flex: none; }
+.x:hover { background: rgba(239,68,68,.12); color: #ef4444; }
+.star { border: none; background: none; font-size: 19px; width: 32px; height: 32px; border-radius: 8px; color: var(--line); flex: none; }
+.star.on { color: #f2a900; }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 2px; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; margin-top: 14px; cursor: pointer; }
+
+/* ---------- chip library ---------- */
+details.lib { margin-top: 18px; border-top: var(--bw) solid var(--line); padding-top: 14px; }
+details.lib summary { cursor: pointer; font-weight: 700; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.lib summary::-webkit-details-marker { display: none; }
+details.lib summary::before { content: "+"; width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 8px;
+                              background: var(--surface-2); border: var(--bw) solid var(--line); font-size: 15px; }
+details.lib[open] summary::before { content: "–"; }
+.libgroup { margin-top: 14px; }
+.libgroup h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: var(--bw) solid var(--line); background: var(--surface); border-radius: 99px; padding: 7px 12px; font-size: 13.5px; transition: .1s; }
+[data-theme="receipt"] .chip { border-radius: 0; }
+.chip:hover { border-color: var(--ink); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip small { opacity: .65; margin-left: 5px; font-size: 12px; }
+
+/* ---------- preview ---------- */
+aside { position: sticky; top: 20px; display: grid; gap: 12px; }
+.paper-wrap { background: var(--paper-bg); border-radius: var(--radius); padding: 24px 0 0; display: flex; justify-content: center;
+              border: var(--bw) solid var(--line); max-height: calc(100vh - 210px); overflow-y: auto; }
+.paper { width: 352px; background: #fff; color: #111; padding: 18px 12px 28px; min-height: 240px;
+         font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.5;
+         box-shadow: 0 2px 12px rgba(0,0,0,.12); align-self: flex-start;
+         -webkit-mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
+           conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x;
+                 mask: linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,
+           conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) bottom/12px 8px repeat-x; }
+.paper div { white-space: pre; overflow: hidden; min-height: 1.5em; }
+.paper .b { font-weight: 700; } .paper .big { font-size: 22px; line-height: 1.25; }
+.paper .center { text-align: center; } .paper .right { text-align: right; }
+.actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.kbd { text-align: center; font-size: 12px; color: var(--muted); }
+kbd { font-family: inherit; font-size: 11px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; background: var(--surface); }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg);
+         padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; opacity: 0; transition: .2s; pointer-events: none; z-index: 10; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+.toast.err { background: #ef4444; color: #fff; }
+
+@media (max-width: 960px) {
+  main { grid-template-columns: 1fr; padding: 16px 16px 120px; }
+  .top { padding: 14px 16px; flex-wrap: wrap; } .tabs { padding: 0 16px; }
+  .seg { display: flex; } .seg button { flex: 1; justify-content: center; padding: 10px 6px; font-size: 14px; gap: 5px; }
+  aside { position: static; }
+  .paper-wrap { max-height: none; }
+  .actions { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+             background: var(--surface); border-top: var(--bw) solid var(--line); z-index: 5; }
+  .kbd { display: none; }
+  .themes button span { display: none; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>Receipt Printer <span>· print anything</span></h1>
+<header class="top">
+  <div class="brand"><div class="logo">▤</div>Slip</div>
+  <div class="spacer"></div>
   <div id="status" class="pill"><i></i><span>Checking printer…</span></div>
+  <div class="themes" id="themes" title="Design">
+    <button data-theme="studio"><i class="sw" style="background:#fff"></i><span>Studio</span></button>
+    <button data-theme="night"><i class="sw" style="background:#14161b;border-color:#c6ff3d"></i><span>Night</span></button>
+    <button data-theme="receipt"><i class="sw" style="background:#000;border-radius:0"></i><span>Receipt</span></button>
+  </div>
 </header>
 
-<nav class="modes" id="modes">
-  <button class="mode" data-mode="shopping">🛒 Shopping list</button>
-  <button class="mode" data-mode="todo">✅ To-do</button>
-  <button class="mode" data-mode="gym">🏋️ Gym</button>
+<nav class="tabs">
+  <div class="seg" id="modes">
+    <button data-mode="shopping">🛒 Shopping <span class="badge" data-badge="shopping">0</span></button>
+    <button data-mode="todo">✅ To-do <span class="badge" data-badge="todo">0</span></button>
+    <button data-mode="gym">🏋️ Gym <span class="badge" data-badge="gym">0</span></button>
+  </div>
 </nav>
 
 <main>
-  <section class="card">
-    <label class="h" for="dictation" id="dictLabel">Say your list</label>
-    <textarea id="dictation" autofocus></textarea>
-    <div class="hint" id="hint"></div>
+  <div class="col">
+    <section class="panel" id="tplPanel">
+      <div class="panel-head"><h2 id="tplTitle">Start from a template</h2><p class="sub" id="tplSub"></p></div>
+      <div id="tplGrid" class="tpl-grid"></div>
+      <div id="pickerSlot"></div>
+    </section>
 
-    <div id="presets"></div>
+    <section class="panel" id="buildPanel">
+      <div class="panel-head"><h2>Build your own</h2><p class="sub">Say it, tap it, or type it</p></div>
 
-    <label class="h" for="title" id="titleLabel">Title</label>
-    <input id="title" type="text">
+      <div class="say">
+        <textarea id="dictation" rows="3"></textarea>
+        <span class="mic">🎙 works with Wispr Flow</span>
+      </div>
+      <p class="sub" id="hint" style="margin-top:8px"></p>
 
-    <div style="height:22px"></div>
-    <label class="h" id="itemsLabel">Items</label>
-    <ul id="items" class="items"></ul>
-    <div class="row"><input id="add" type="text"></div>
+      <label class="h" for="title" id="titleLabel">Title</label>
+      <input id="title" type="text">
 
-    <label class="toggle opt" data-for="shopping"><input id="aisle" type="checkbox" checked> Group by aisle</label>
-  </section>
+      <label class="h" id="itemsLabel">Items</label>
+      <ul id="items" class="items"></ul>
+      <div style="margin-top:8px"><input id="add" type="text"></div>
+      <label class="toggle opt hidden" data-for="shopping"><input id="aisle" type="checkbox" checked> Group by aisle</label>
 
-  <section>
+      <details class="lib" id="lib"><summary id="libTitle">Add common items</summary><div id="libGroups"></div></details>
+    </section>
+  </div>
+
+  <aside>
     <div class="paper-wrap"><div id="paper" class="paper"></div></div>
     <div class="actions">
-      <button id="print" class="btn primary">Print</button>
-      <button id="clear" class="btn ghost">Clear</button>
+      <button id="print" class="btn btn-primary btn-lg">Print</button>
+      <button id="clear" class="btn btn-ghost">Clear</button>
     </div>
-    <div class="hint" style="text-align:center"><kbd>⌘</kbd> + <kbd>Enter</kbd> prints</div>
-  </section>
+    <div class="kbd"><kbd>⌘</kbd> + <kbd>Enter</kbd> prints</div>
+  </aside>
 </main>
 
 <div id="toast" class="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const norm = (s) => String(s || "").trim().toLowerCase();
+const norm = (s) => String(s ?? "").trim().toLowerCase();
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 // ---------------------------------------------------------------------------
-// Mode definitions. Each mode says how to label the screen, how to identify
-// an item (key), and how to draw one editable row.
+// Theme (Studio / Night / Receipt), remembered in this browser
 // ---------------------------------------------------------------------------
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll("#themes button").forEach((b) => b.classList.toggle("on", b.dataset.theme === t));
+  try { localStorage.slipTheme = t; } catch {}
+}
+document.querySelectorAll("#themes button").forEach((b) => b.onclick = () => setTheme(b.dataset.theme));
+let savedTheme = "studio"; try { savedTheme = localStorage.slipTheme || "studio"; } catch {}
+setTheme(savedTheme);
+
+// ---------------------------------------------------------------------------
+// Modes: labels + how to identify, describe, and edit an item
+// ---------------------------------------------------------------------------
+const repsText = (i) => i.sets && i.reps ? `${i.sets} × ${i.reps}` : i.sets ? `${i.sets} sets` : i.reps ? `${i.reps} reps` : "";
 const MODES = {
   shopping: {
-    dictLabel: "Say your list", itemsLabel: "Items", titleLabel: "Store",
-    titlePh: "Optional — e.g. Trader Joe's", addPh: "Add an item and press Enter",
-    printLabel: "Print list",
-    placeholder: "Click here, then dictate with Wispr Flow. e.g. “I’m going to Trader Joe’s. My list is bananas, apples, a gallon of milk, eggs and mac and cheese.”",
-    hint: "Commas, “and”, or new lines split items. Filler words get dropped. Mention a store (“going to Market Basket”) to put it on the slip.",
-    key: (i) => norm(i), label: (i) => i,
+    tplTitle: "Grab a basket", tplSub: "Tap one, untick what you already have, print",
+    itemsLabel: "Your list", titleLabel: "Store", titlePh: "Optional, e.g. Trader Joe's",
+    addPh: "Add an item and press Enter", libTitle: "Add groceries by aisle", printLabel: "Print list",
+    placeholder: "“I’m going to Trader Joe’s. My list is bananas, apples, a gallon of milk, eggs and mac and cheese.”",
+    hint: "Commas, “and”, or new lines split items. Mention a store to put it on the slip.",
+    key: (i) => norm(i), label: (i) => i, note: () => "",
     fromText: (t) => t[0].toUpperCase() + t.slice(1),
-    row: (item, set) => [textInput(item, (v) => set(v))],
+    row: (item, set) => [textInput(item, set)],
   },
   todo: {
-    dictLabel: "Say what you need to do", itemsLabel: "Tasks", titleLabel: "Title",
-    titlePh: "Optional — defaults to TO-DO", addPh: "Add a task and press Enter",
-    printLabel: "Print to-dos",
-    placeholder: "e.g. “Today I need to call the bank, it’s urgent, finish my resume, go to the gym and call mom and dad.”",
-    hint: "Say “urgent”, “important” or “top priority” and the task goes in the PRIORITY section. Tap ★ to change it. Say “my daily routine” to load the preset.",
-    routinesLabel: "Start from a routine", libLabel: "Add common tasks",
-    key: (i) => norm(i.text), label: (i) => i.text,
+    tplTitle: "Plan the day", tplSub: "Proven formats: tap one, untick what you skip, print",
+    itemsLabel: "Tasks", titleLabel: "Title", titlePh: "Optional, defaults to TO-DO",
+    addPh: "Add a task and press Enter", libTitle: "Add common tasks", printLabel: "Print to-dos",
+    placeholder: "“Today I need to call the bank, it’s urgent, finish my resume, go to the gym and call mom and dad.”",
+    hint: "Say “urgent” or “top priority” to put a task in the PRIORITY section. Tap ★ to change it.",
+    key: (i) => norm(i.text), label: (i) => i.blank ? (i.label || "Blank line") : i.text,
+    note: (i) => i.blank ? "blank line to fill in" : (i.priority ? "★ priority" : ""),
     fromText: (t) => ({ text: t[0].toUpperCase() + t.slice(1), priority: false }),
     row: (item, set) => {
-      const star = document.createElement("button");
-      star.className = "star" + (item.priority ? " on" : ""); star.textContent = "★";
-      star.title = item.priority ? "Priority" : "Mark as priority";
-      star.onclick = () => { set({ ...item, priority: !item.priority }); renderItems(); };
+      const star = el("button", "star" + (item.priority ? " on" : ""), "★");
+      star.title = "Priority";
+      star.onclick = () => { set({ ...item, priority: !item.priority }); renderAll(); };
       return [star, textInput(item.text, (v) => set({ ...item, text: v }))];
     },
   },
   gym: {
-    dictLabel: "Say your workout", itemsLabel: "Exercises", titleLabel: "Workout",
-    titlePh: "Optional — e.g. Push day", addPh: "Add an exercise, e.g. “Squat 5x5 at 225”, and press Enter",
+    tplTitle: "Today’s workout", tplSub: "A = strength (heavier, fewer reps) · B = volume (lighter, more reps)",
+    itemsLabel: "Exercises", titleLabel: "Workout", titlePh: "Optional, e.g. Push day",
+    addPh: "Add an exercise, e.g. “Squat 5x5 at 225”, and press Enter", libTitle: "Add exercises",
     printLabel: "Print workout",
-    placeholder: "e.g. “Push day. Bench press 3 sets of 8 at 185, incline dumbbell press 3x10 with 60s, tricep pushdowns 3 by 12, and 20 minutes on the treadmill.”",
-    hint: "Say “today’s push”, “today’s pull” or “today’s legs” to load a full workout, or your own: “3 sets of 8 at 185”, “3x8”, “20 minutes”. Each set prints a box with a blank to write what you actually did.",
-    routinesLabel: "Today’s workout", libLabel: "Add exercises",
-    chipNote: (i) => i.duration || (i.sets && i.reps ? `${i.sets}×${i.reps}` : ""),
+    placeholder: "“Today’s push” loads a full workout. Or say your own: “Bench 3 sets of 8 at 185, 20 minutes on the treadmill.”",
+    hint: "Say sets × reps (“3 sets of 8”, “3x8”), weight (“at 185”, “100 kg”) or time (“20 minutes”).",
     key: (i) => norm(i.name), label: (i) => i.name, rowClass: "ex",
+    note: (i) => i.duration ? i.duration : [repsText(i), i.rest && `rest ${i.rest}`].filter(Boolean).join(" · "),
     fromText: (t) => ({ name: t, sets: null, reps: null, weight: null, unit: "lb", duration: null }),
     row: (item, set) => {
-      let latest = item;   // keep every field edit, not just the last one
+      let latest = item;
       const upd = (patch) => { latest = { ...latest, ...patch }; set(latest); };
-      const name = textInput(item.name, (v) => upd({ name: v }));
-      name.classList.add("name");
-      const num = (field, ph) => {
-        const i = document.createElement("input"); i.type = "text"; i.inputMode = "decimal";
-        i.placeholder = ph; i.value = item[field] ?? ""; i.title = ph;
-        i.oninput = () => upd({ [field]: i.value === "" ? null : (isNaN(+i.value) ? i.value : +i.value) });
+      const name = textInput(item.name, (v) => upd({ name: v })); name.classList.add("name");
+      const field = (k, ph, wide) => {
+        const i = el("input"); i.type = "text"; i.placeholder = ph; i.title = ph; i.value = item[k] ?? "";
+        if (wide) i.className = "wide";
+        i.oninput = () => upd({ [k]: i.value === "" ? null : (isNaN(+i.value) ? i.value : +i.value) });
         return i;
       };
-      const unit = document.createElement("select");
+      const unit = el("select");
       ["lb", "kg"].forEach((u) => unit.add(new Option(u, u, false, (item.unit || "lb") === u)));
       unit.onchange = () => upd({ unit: unit.value });
-      const dur = document.createElement("input"); dur.type = "text"; dur.className = "dur";
-      dur.placeholder = "time"; dur.title = "e.g. 20 min"; dur.value = item.duration ?? "";
-      dur.oninput = () => upd({ duration: dur.value || null });
-      const nums = document.createElement("div"); nums.className = "nums";
-      nums.append(num("sets", "sets"), "×", num("reps", "reps"), "@", num("weight", "wt"), unit, "or", dur);
-      return [name, "X", nums];   // "X" = where the remove button goes
+      const nums = el("div", "nums");
+      nums.append(field("sets", "sets"), "×", field("reps", "reps"), "@", field("weight", "wt"), unit, "or", field("duration", "time", true));
+      return [name, "X", nums];
     },
   },
 };
-
 function textInput(value, onInput) {
-  const i = document.createElement("input"); i.type = "text"; i.value = value ?? "";
-  i.oninput = () => onInput(i.value); return i;
+  const i = el("input"); i.type = "text"; i.value = value ?? ""; i.oninput = () => onInput(i.value); return i;
 }
 
 // ---------------------------------------------------------------------------
-// State, one bucket per mode. The list = whatever the dictation box parses to,
-// plus items added by hand. Edits and deletions are remembered by item key, so
-// re-parsing the dictation never undoes them.
+// State: one bucket per mode
+//   dictated  = what the textbox currently parses to
+//   manual    = added by tapping chips / typing in the add box
+//   edits / removed = your changes, remembered by item key
+//   picker    = an open template (checklist); while open, it's what prints
 // ---------------------------------------------------------------------------
 const fresh = () => ({ text: "", dictated: [], manual: [], removed: new Set(), edits: {},
-                       title: "", parsedTitle: "", titleTouched: false, options: { by_aisle: true }, picker: null });
+                       title: "", titleTouched: false, options: { by_aisle: true }, picker: null });
 const S = { shopping: fresh(), todo: fresh(), gym: fresh() };
-let mode = "shopping";
-try { if (MODES[localStorage.rpMode]) mode = localStorage.rpMode; } catch {}
+let mode = "gym", PRESETS = {};
+try { if (MODES[localStorage.slipMode]) mode = localStorage.slipMode; } catch {}
 const st = () => S[mode], cfg = () => MODES[mode];
 
-function currentItems() {
-  const s = st(), c = cfg(), out = [], seen = new Set();
+function listItems(m = mode) {
+  const s = S[m], c = MODES[m], out = [], seen = new Set();
   const push = (orig) => {
     const k = c.key(orig);
     if (s.removed.has(k)) return;
@@ -268,111 +407,13 @@ function currentItems() {
   s.dictated.forEach(push); s.manual.forEach(push);
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// Presets: one tap loads a whole routine (replacing the list); chips in the
-// library add or remove single items.
-// ---------------------------------------------------------------------------
-let PRESETS = {};
-
-// Tapping a routine opens it as a checklist, every item ticked. Untick what
-// you're skipping, then Print. The preview and Print button follow the ticks.
-function openPicker(key, r) {
-  const s = st();
-  if (s.picker && s.picker.key === key) return closePicker();
-  s.picker = { key, r, off: new Set() };
-  $("title").value = r.title;
-  renderItems(); refreshPreview();
+const routineItems = (r) => r.exercises || r.items;
+function pickerItems(m = mode) {
+  const p = S[m].picker; if (!p) return [];
+  return routineItems(p.r).filter((_, i) => !p.off.has(i));
 }
-function closePicker() {
-  const s = st(); s.picker = null; $("title").value = s.title;
-  renderItems(); refreshPreview();
-}
-function pickerItems() {
-  const p = st().picker; if (!p) return [];
-  return (p.r.exercises || p.r.items).filter((_, i) => !p.off.has(i));
-}
-function pickerToList() {   // "Edit as list": move the ticked items into the editor
-  const p = st().picker, items = pickerItems().map((i) => ({ ...i }));
-  S[mode] = { ...fresh(), manual: items, title: p.r.title };
-  switchMode(mode);
-}
-
-function renderPicker() {
-  const s = st(), p = s.picker, c = cfg(), all = p.r.exercises || p.r.items;
-  const box = document.createElement("div"); box.className = "picker";
-  const head = document.createElement("div"); head.className = "picker-head";
-  head.innerHTML = '<b></b><span class="links"><button data-a="all">All</button><button data-a="none">None</button></span>';
-  head.querySelector("b").textContent = `${p.r.emoji} ${p.r.title}`;
-  head.querySelector("[data-a=all]").onclick = () => { p.off.clear(); renderItems(); refreshPreview(); };
-  head.querySelector("[data-a=none]").onclick = () => { all.forEach((_, i) => p.off.add(i)); renderItems(); refreshPreview(); };
-  box.append(head);
-  all.forEach((it, i) => {
-    const row = document.createElement("label"); row.className = "pick" + (p.off.has(i) ? " off" : "");
-    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !p.off.has(i);
-    cb.onchange = () => { cb.checked ? p.off.delete(i) : p.off.add(i);
-                          row.classList.toggle("off", !cb.checked); refreshPreview(); };
-    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = c.label(it);
-    const nt = document.createElement("span"); nt.className = "nt"; nt.textContent = (c.chipNote && c.chipNote(it)) || "";
-    row.append(cb, nm, nt); box.append(row);
-  });
-  const act = document.createElement("div"); act.className = "picker-actions";
-  const pr = document.createElement("button"); pr.className = "btn primary"; pr.textContent = "Print " + p.r.label;
-  pr.onclick = doPrint;
-  const ed = document.createElement("button"); ed.className = "btn ghost"; ed.textContent = "Edit as list";
-  ed.onclick = pickerToList;
-  const cl = document.createElement("button"); cl.className = "btn ghost"; cl.textContent = "Close";
-  cl.onclick = closePicker;
-  act.append(pr, ed, cl); box.append(act);
-  return box;
-}
-
-function toggleChip(item) {
-  const c = cfg(), s = st(), k = c.key(item);
-  const inList = currentItems().some((i) => i.k === k || c.key(i.item) === k);
-  if (inList) { s.removed.add(k); }
-  else { s.manual.push({ ...item }); s.removed.delete(k); delete s.edits[k]; }
-  renderItems(); refreshPreview();
-}
-
-function renderPresets() {
-  const box = $("presets"), p = PRESETS[mode], c = cfg(); box.innerHTML = "";
-  if (!p) return;
-  const lab = document.createElement("label"); lab.className = "h"; lab.textContent = c.routinesLabel;
-  const grid = document.createElement("div"); grid.className = "routines";
-  for (const r of Object.values(p.routines)) {
-    const b = document.createElement("button"); b.className = "routine";
-    b.innerHTML = `<b></b><span></span>`;
-    b.querySelector("b").textContent = `${r.emoji} ${r.label}`;
-    b.querySelector("span").textContent = r.blurb;
-    const key = Object.keys(p.routines).find((k) => p.routines[k] === r);
-    if (st().picker && st().picker.key === key) b.classList.add("open");
-    b.onclick = () => openPicker(key, r); grid.append(b);
-  }
-  const det = document.createElement("details"); det.className = "lib";
-  if (sessionStorage.getItem("lib-" + mode) === "1") det.open = true;
-  det.ontoggle = () => sessionStorage.setItem("lib-" + mode, det.open ? "1" : "0");
-  det.innerHTML = `<summary></summary><div class="libgroups"></div>`;
-  det.querySelector("summary").textContent = c.libLabel;
-  const groups = det.querySelector(".libgroups");
-  const inList = new Set(currentItems().map((i) => c.key(i.item)));
-  for (const [g, items] of Object.entries(p.library)) {
-    const wrap = document.createElement("div"); wrap.className = "libgroup";
-    wrap.innerHTML = `<h4></h4><div class="chips"></div>`; wrap.querySelector("h4").textContent = g;
-    for (const it of items) {
-      const chip = document.createElement("button");
-      chip.className = "chip" + (inList.has(c.key(it)) ? " on" : "");
-      chip.textContent = c.label(it);
-      const note = c.chipNote && c.chipNote(it);
-      if (note) { const sm = document.createElement("small"); sm.textContent = note; chip.append(sm); }
-      chip.onclick = () => toggleChip(it);
-      wrap.querySelector(".chips").append(chip);
-    }
-    groups.append(wrap);
-  }
-  box.append(lab, grid);
-  if (st().picker) box.append(renderPicker());
-  box.append(det);
+function printableItems(m = mode) {
+  return S[m].picker ? pickerItems(m) : listItems(m).map((i) => i.item);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,9 +425,8 @@ async function api(path, body) {
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function toast(msg, err) {
   const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", 3200);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = "toast", 3000);
 }
-
 async function checkStatus() {
   const pill = $("status");
   try {
@@ -398,47 +438,105 @@ async function checkStatus() {
 }
 
 // ---------------------------------------------------------------------------
-function switchMode(m) {
-  st().text = $("dictation").value;
-  mode = m; try { localStorage.rpMode = m; } catch {}
-  const c = cfg(), s = st();
-  document.querySelectorAll(".mode").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
-  document.querySelectorAll(".opt").forEach((o) => o.classList.toggle("show", o.dataset.for === m));
-  $("dictLabel").textContent = c.dictLabel; $("itemsLabel").textContent = c.itemsLabel;
-  $("titleLabel").textContent = c.titleLabel; $("title").placeholder = c.titlePh;
-  $("add").placeholder = c.addPh; $("dictation").placeholder = c.placeholder; $("hint").textContent = c.hint;
-  $("dictation").value = s.text; $("title").value = s.picker ? s.picker.r.title : s.title; $("aisle").checked = s.options.by_aisle;
-  $("print").textContent = c.printLabel;
-  renderItems(); refreshPreview(); $("dictation").focus();
+// Templates: tap a card -> its items open as a pre-ticked checklist
+// ---------------------------------------------------------------------------
+function renderTemplates() {
+  const grid = $("tplGrid"), p = PRESETS[mode], s = st(); grid.innerHTML = "";
+  $("tplTitle").textContent = cfg().tplTitle; $("tplSub").textContent = cfg().tplSub;
+  if (!p) return;
+  const entries = Object.entries(p.routines), groups = {}, done = new Set();
+  for (const [k, r] of entries) if (r.group) (groups[r.group] ||= []).push([k, r]);
+
+  for (const [k, r] of entries) {
+    if (r.group) {           // Push / Pull / Legs: one card with A and B buttons
+      if (done.has(r.group)) continue; done.add(r.group);
+      const card = el("div", "tpl-group"); card.style.setProperty("--c", r.color);
+      const head = el("div", "tpl-group-head");
+      const top = el("div", "tpl-top"); top.append(el("span", "tpl-emoji", r.emoji), el("span", "", r.group));
+      head.append(top, el("div", "tpl-sub", r.blurb));
+      const btns = el("div", "tpl-group-btns");
+      for (const [gk, gr] of groups[r.group]) {
+        const b = el("button", s.picker && s.picker.key === gk ? "open" : "");
+        b.append(el("b", "", gr.label.split(" ").pop() + " · " + gr.flavor),
+                 el("span", "", routineItems(gr).length + " exercises"));
+        b.onclick = () => openPicker(gk, gr); btns.append(b);
+      }
+      card.append(head, btns); grid.append(card);
+    } else {
+      const b = el("button", "tpl" + (s.picker && s.picker.key === k ? " open" : ""));
+      b.style.setProperty("--c", r.color);
+      const top = el("div", "tpl-top"); top.append(el("span", "tpl-emoji", r.emoji), el("span", "", r.label));
+      b.append(top, el("div", "tpl-sub", r.blurb));
+      const n = routineItems(r).length;
+      b.append(el("span", "tpl-tag", r.sheet ? "Fill-in sheet" : `${n} ${mode === "shopping" ? "items" : "tasks"}`));
+      b.onclick = () => openPicker(k, r); grid.append(b);
+    }
+  }
 }
 
+function openPicker(key, r) {
+  const s = st();
+  if (s.picker && s.picker.key === key) return closePicker();
+  s.picker = { key, r, off: new Set() };
+  renderAll();
+  $("pickerSlot").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function closePicker() { st().picker = null; renderAll(); }
+function pickerToList() {     // "Edit as list": move the ticked items into the editor
+  const p = st().picker, items = pickerItems().map((i) => (typeof i === "object" ? { ...i } : i));
+  const keepOpts = st().options;
+  S[mode] = { ...fresh(), manual: items, title: p.r.title || "", options: keepOpts };
+  renderAll(); $("buildPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderPicker() {
+  const slot = $("pickerSlot"), s = st(), c = cfg(); slot.innerHTML = "";
+  if (!s.picker) return;
+  const p = s.picker, all = routineItems(p.r);
+  const box = el("div", "picker"); box.style.setProperty("--c", p.r.color);
+  const head = el("div", "picker-head");
+  head.append(el("span", "tpl-emoji", p.r.emoji), el("span", "ttl", p.r.title || p.r.label),
+              el("span", "cnt", `${all.length - p.off.size} of ${all.length}`));
+  const allB = el("button", "linkbtn", "All"), noneB = el("button", "linkbtn", "None");
+  allB.onclick = () => { p.off.clear(); renderAll(); };
+  noneB.onclick = () => { all.forEach((_, i) => p.off.add(i)); renderAll(); };
+  head.append(allB, noneB); box.append(head);
+  all.forEach((it, i) => {
+    const row = el("label", "pick" + (p.off.has(i) ? " off" : ""));
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !p.off.has(i);
+    cb.onchange = () => { cb.checked ? p.off.delete(i) : p.off.add(i); renderAll(); };
+    row.append(cb, el("span", "box"), el("span", "nm", c.label(it)), el("span", "nt", c.note(it)));
+    box.append(row);
+  });
+  const foot = el("div", "picker-foot");
+  const pr = el("button", "btn btn-primary", "Print " + p.r.label); pr.onclick = doPrint;
+  foot.append(pr);
+  if (!p.r.sheet) { const ed = el("button", "btn btn-ghost", "Edit as list"); ed.onclick = pickerToList; foot.append(ed); }
+  const cl = el("button", "btn btn-ghost", "Close"); cl.onclick = closePicker; foot.append(cl);
+  box.append(foot); slot.append(box);
+}
+
+// ---------------------------------------------------------------------------
+// Build your own: dictation, list editor, chip library
+// ---------------------------------------------------------------------------
 const parseDictation = debounce(async () => {
   const m = mode, s = S[m];
   s.text = $("dictation").value;
-  if (s.picker && s.text.trim()) { s.picker = null; $("title").value = s.title; }
   const res = await api("/api/parse", { mode: m, text: s.text });
-  if (m !== mode) return;  // switched tabs while waiting
-  if (!s.titleTouched) { s.title = res.title || ""; $("title").value = s.title; }
+  if (!s.titleTouched) s.title = res.title || "";
   s.dictated = res.items || [];
-  renderItems(); refreshPreview();
+  if (m === mode) renderAll();
 }, 350);
 
-function renderItems() {
+function renderList() {
   const ul = $("items"), c = cfg(), s = st(); ul.innerHTML = "";
-  renderPresets();
-  const picking = !!s.picker;
-  ["itemsLabel", "items", "add"].forEach((id) => $(id).classList.toggle("hidden", picking));
-  document.querySelectorAll("details.lib").forEach((d) => d.classList.toggle("hidden", picking));
-  if (picking) return;
-  const items = currentItems();
-  if (!items.length) {
-    ul.innerHTML = '<li class="empty">Nothing yet — dictate above or add below.</li>'; return;
-  }
+  const items = listItems();
+  if (!items.length) { ul.append(el("li", "empty", "Nothing yet. Pick a template above, tap items below, or say your list.")); return; }
   for (const { k, item } of items) {
-    const li = document.createElement("li"); if (c.rowClass) li.className = c.rowClass;
-    const set = (v) => { s.edits[k] = v; refreshPreview(); };
-    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Remove";
-    x.onclick = () => { s.removed.add(k); renderItems(); refreshPreview(); };
+    const li = el("li", c.rowClass || "");
+    const set = (v) => { s.edits[k] = v; refreshPreview(); updateBadges(); };
+    const x = el("button", "x", "×"); x.title = "Remove";
+    x.onclick = () => { s.removed.add(k); renderAll(); };
     const parts = c.row(item, set);
     if (!parts.includes("X")) parts.push("X");
     li.append(...parts.map((p) => (p === "X" ? x : p)));
@@ -446,35 +544,64 @@ function renderItems() {
   }
 }
 
-function payload() {
-  const s = st();
-  const items = s.picker ? pickerItems() : currentItems().map((i) => i.item);
-  return { mode, title: $("title").value, items, options: s.options };
+function toggleChip(item) {
+  const c = cfg(), s = st(), k = c.key(item);
+  if (listItems().some((i) => c.key(i.item) === k)) s.removed.add(k);
+  else { s.manual.push(typeof item === "object" ? { ...item } : item); s.removed.delete(k); delete s.edits[k]; }
+  renderAll();
+}
+function renderLibrary() {
+  const box = $("libGroups"), p = PRESETS[mode], c = cfg(); box.innerHTML = "";
+  $("libTitle").textContent = c.libTitle;
+  if (!p) return;
+  const inList = new Set(listItems().map((i) => c.key(i.item)));
+  for (const [g, items] of Object.entries(p.library)) {
+    const wrap = el("div", "libgroup"); wrap.append(el("h4", "", g));
+    const chips = el("div", "chips");
+    for (const it of items) {
+      const chip = el("button", "chip" + (inList.has(c.key(it)) ? " on" : ""), c.label(it));
+      const note = mode === "gym" ? (it.duration || repsText(it)) : "";
+      if (note) chip.append(el("small", "", note));
+      chip.onclick = () => toggleChip(it); chips.append(chip);
+    }
+    wrap.append(chips); box.append(wrap);
+  }
 }
 
+// ---------------------------------------------------------------------------
+// Preview + print
+// ---------------------------------------------------------------------------
+function payload() {
+  const s = st();
+  const title = s.picker ? (s.picker.r.title || "") : $("title").value;
+  return { mode, title, items: printableItems(), options: s.options };
+}
 const refreshPreview = debounce(async () => {
-  const m = mode;
-  const res = await api("/api/preview", payload());
+  const m = mode, res = await api("/api/preview", payload());
   if (m !== mode) return;
   const paper = $("paper"); paper.innerHTML = "";
-  for (const r of res.rows) {
-    const d = document.createElement("div");
-    d.textContent = r.text || " ";
-    d.className = [r.bold && "b", r.big && "big", r.align].filter(Boolean).join(" ");
-    paper.append(d);
+  for (const r of res.rows) paper.append(el("div", [r.bold && "b", r.big && "big", r.align].filter(Boolean).join(" "), r.text || " "));
+}, 120);
+
+function updateBadges() {
+  for (const m of Object.keys(MODES)) {
+    const n = printableItems(m).length, b = document.querySelector(`[data-badge="${m}"]`);
+    b.textContent = n; b.style.visibility = n ? "visible" : "hidden";
   }
-  $("print").disabled = !(st().picker ? pickerItems().length : currentItems().length);
-}, 150);
+  const n = printableItems().length, s = st();
+  $("print").disabled = !n;
+  $("print").textContent = s.picker ? `Print ${s.picker.r.label}` : `${cfg().printLabel}${n ? ` · ${n}` : ""}`;
+}
 
 async function doPrint() {
-  if (!payload().items.length) return toast("Nothing ticked to print.", true);
-  const label = cfg().printLabel;
-  $("print").disabled = true; $("print").textContent = "Printing…";
+  const body = payload();
+  if (!body.items.length) return toast("Nothing selected to print.", true);
+  const btn = $("print"); btn.disabled = true; btn.textContent = "Printing…";
   try {
-    const r = await api("/api/print", payload());
-    r.ok ? toast("🧾 Sent to printer") : toast("Print failed: " + r.detail, true);
-  } catch (e) { toast("Couldn't reach the app — is it still running?", true); }
-  $("print").textContent = label; refreshPreview();
+    const r = await api("/api/print", body);
+    r.ok ? toast("🧾 Printing") : toast("Print failed: " + r.detail, true);
+  } catch { toast("Couldn't reach the app. Is it still running?", true); }
+  updateBadges();
 }
 
 async function addFromBox(e) {
@@ -484,7 +611,28 @@ async function addFromBox(e) {
   const res = await api("/api/parse", { mode: m, text });
   const items = res.items && res.items.length ? res.items : [c.fromText(text)];
   for (const it of items) { const k = c.key(it); s.manual.push(it); s.removed.delete(k); delete s.edits[k]; }
-  if (m === mode) { renderItems(); refreshPreview(); }
+  if (m === mode) renderAll();
+}
+
+// ---------------------------------------------------------------------------
+function renderAll() {
+  const s = st(), c = cfg();
+  document.querySelectorAll("#modes button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+  document.querySelectorAll(".opt").forEach((o) => o.classList.toggle("hidden", o.dataset.for !== mode));
+  $("buildPanel").classList.toggle("hidden", !!s.picker);
+  $("itemsLabel").textContent = c.itemsLabel; $("titleLabel").textContent = c.titleLabel;
+  $("title").placeholder = c.titlePh; $("add").placeholder = c.addPh;
+  $("dictation").placeholder = c.placeholder; $("hint").textContent = c.hint;
+  if (document.activeElement !== $("dictation")) $("dictation").value = s.text;
+  if (document.activeElement !== $("title")) $("title").value = s.title;
+  $("aisle").checked = s.options.by_aisle;
+  renderTemplates(); renderPicker(); renderList(); renderLibrary(); updateBadges(); refreshPreview();
+}
+function switchMode(m) {
+  st().text = $("dictation").value;
+  mode = m; try { localStorage.slipMode = m; } catch {}
+  $("dictation").value = st().text; $("title").value = st().title;
+  renderAll();
 }
 
 $("dictation").addEventListener("input", parseDictation);
@@ -492,12 +640,12 @@ $("title").addEventListener("input", () => { st().title = $("title").value; st()
 $("aisle").addEventListener("change", () => { st().options.by_aisle = $("aisle").checked; refreshPreview(); });
 $("add").addEventListener("keydown", addFromBox);
 $("print").onclick = doPrint;
-$("clear").onclick = () => { S[mode] = fresh(); switchMode(mode); };
-document.querySelectorAll(".mode").forEach((b) => b.onclick = () => switchMode(b.dataset.mode));
+$("clear").onclick = () => { S[mode] = fresh(); $("dictation").value = ""; $("title").value = ""; renderAll(); };
+document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => switchMode(b.dataset.mode));
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) doPrint(); });
 
-api("/api/presets").then((p) => { PRESETS = p; renderPresets(); }).catch(() => {});
-switchMode(mode); checkStatus(); setInterval(checkStatus, 15000);
+api("/api/presets").then((p) => { PRESETS = p; renderAll(); }).catch(() => {});
+renderAll(); checkStatus(); setInterval(checkStatus, 15000);
 </script>
 </body>
 </html>
